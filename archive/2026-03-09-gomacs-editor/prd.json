@@ -1,0 +1,227 @@
+{
+  "project": "Gomacs",
+  "branchName": "ralph/gomacs-editor",
+  "description": "Gomacs - Minimal Emacs-like CLI editor written in pure Go with tcell for terminal handling",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project Setup and Terminal Initialization",
+      "description": "As a developer, I need the Go project scaffolding and terminal initialization so that the editor can take over the terminal screen.",
+      "acceptanceCriteria": [
+        "go.mod initialized with module name gomacs",
+        "tcell added as dependency (github.com/gdamore/tcell/v2)",
+        "Main function initializes a tcell.Screen, enters raw mode, and cleans up on exit",
+        "Running go run . shows a blank terminal screen and exits cleanly on C-c",
+        "go build produces a working binary",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Buffer Data Structure",
+      "description": "As a developer, I need an in-memory buffer data structure to hold text content so that editing operations can be performed efficiently.",
+      "acceptanceCriteria": [
+        "Buffer struct stores lines as a slice of rune slices ([][]rune)",
+        "Buffer tracks cursor position (row, column)",
+        "Buffer supports inserting a character at cursor position",
+        "Buffer supports deleting a character at cursor position (backspace)",
+        "Buffer supports inserting a newline (splitting a line)",
+        "Buffer supports deleting at beginning of line (joining with previous line)",
+        "Unit tests pass for all buffer operations",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Use [][]rune for lines. Create buffer.go and buffer_test.go."
+    },
+    {
+      "id": "US-003",
+      "title": "File Open and Display",
+      "description": "As a user, I want to open a file from the command line so that I can view its contents in the editor.",
+      "acceptanceCriteria": [
+        "Running gomacs filename.txt opens and displays the file content",
+        "Running gomacs with no arguments opens an empty buffer",
+        "File content is rendered correctly in the terminal",
+        "Long lines are truncated at screen width (no wrapping)",
+        "Lines beyond the screen height are not displayed (scrolling comes later)",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Integrate buffer with tcell screen rendering. Read file via os.ReadFile, split by newline."
+    },
+    {
+      "id": "US-004",
+      "title": "Basic Cursor Movement",
+      "description": "As a user, I want to move the cursor using Emacs keybindings so that I can navigate within the file.",
+      "acceptanceCriteria": [
+        "C-f moves cursor forward one character",
+        "C-b moves cursor backward one character",
+        "C-n moves cursor down one line",
+        "C-p moves cursor up one line",
+        "C-a moves cursor to beginning of line",
+        "C-e moves cursor to end of line",
+        "Arrow keys also work for movement",
+        "Cursor does not move beyond buffer boundaries",
+        "Cursor is visually displayed at the correct position",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Scrolling and Viewport",
+      "description": "As a user, I want the view to scroll when the cursor moves beyond the visible area so that I can edit files larger than the screen.",
+      "acceptanceCriteria": [
+        "View scrolls down when cursor moves below the last visible line",
+        "View scrolls up when cursor moves above the first visible line",
+        "M-v (Alt+V or Esc then V) scrolls up one page",
+        "C-v scrolls down one page",
+        "M-< moves to beginning of buffer",
+        "M-> moves to end of buffer",
+        "Scroll offset is tracked and rendering adjusts accordingly",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Track scrollOffset (top visible line). Adjust on cursor movement and page scroll commands."
+    },
+    {
+      "id": "US-006",
+      "title": "Text Insertion and Basic Editing",
+      "description": "As a user, I want to type characters and perform basic edits so that I can modify the file content.",
+      "acceptanceCriteria": [
+        "Printable characters are inserted at cursor position",
+        "Enter inserts a new line and moves cursor to the beginning of the next line",
+        "Backspace deletes the character before the cursor",
+        "C-d deletes the character at the cursor (forward delete)",
+        "C-d at end of line joins the next line to the current line",
+        "Backspace at beginning of line joins the current line to the previous line",
+        "Screen re-renders correctly after each edit",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "Use buffer methods from US-002. Mark buffer as modified on any edit."
+    },
+    {
+      "id": "US-007",
+      "title": "Status Line",
+      "description": "As a user, I want to see a status line at the bottom of the screen so that I know which file I'm editing and where my cursor is.",
+      "acceptanceCriteria": [
+        "Status line is displayed on the second-to-last row of the terminal",
+        "Status line shows the filename (or [No Name] for new buffers)",
+        "Status line shows [Modified] when the buffer has unsaved changes",
+        "Status line shows cursor position as Line X, Col Y",
+        "Status line has a visually distinct background (reverse video)",
+        "Status line updates on every cursor move or edit",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "File Save with C-x C-s",
+      "description": "As a user, I want to save the file so that my changes are persisted to disk.",
+      "acceptanceCriteria": [
+        "C-x C-s saves the current buffer to the file it was opened from",
+        "After saving, the [Modified] indicator is cleared",
+        "A Saved message is briefly shown in the status line or message area",
+        "If buffer has no filename, saving is skipped with an informational message",
+        "File is written safely (write to temp then rename, or equivalent)",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": "Requires C-x prefix key state machine. Implement prefix key handling here."
+    },
+    {
+      "id": "US-009",
+      "title": "Quit with C-x C-c",
+      "description": "As a user, I want to quit the editor cleanly so that the terminal is restored to its normal state.",
+      "acceptanceCriteria": [
+        "C-x C-c quits the editor",
+        "Terminal is fully restored on exit (cursor visible, normal mode)",
+        "If buffer is modified, a warning message is shown and quit is cancelled",
+        "Repeating C-x C-c when modified forces quit without saving",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": "Reuses C-x prefix handling from US-008."
+    },
+    {
+      "id": "US-010",
+      "title": "Kill and Yank (Cut and Paste)",
+      "description": "As a user, I want to cut and paste text using Emacs kill/yank so that I can move text around efficiently.",
+      "acceptanceCriteria": [
+        "C-k kills (cuts) text from cursor to end of line into the kill ring",
+        "C-k on an empty line kills the newline (joins with next line)",
+        "Consecutive C-k commands append to the kill ring entry",
+        "C-y yanks (pastes) the last killed text at cursor position",
+        "Yanked text is inserted correctly, handling multi-line content",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": "Implement a simple kill ring (can be a single string or slice of strings)."
+    },
+    {
+      "id": "US-011",
+      "title": "Mark and Region",
+      "description": "As a user, I want to select a region of text using mark so that I can kill or copy specific sections.",
+      "acceptanceCriteria": [
+        "C-SPC (Ctrl+Space) sets the mark at the current cursor position",
+        "The region between mark and cursor (point) is visually highlighted",
+        "C-w kills (cuts) the region and stores it in the kill ring",
+        "M-w (Alt+W) copies the region to the kill ring without deleting",
+        "C-g deactivates the mark (cancels selection)",
+        "After kill or copy, the mark is deactivated",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": "Requires determining region start/end from mark and point positions."
+    },
+    {
+      "id": "US-012",
+      "title": "Undo",
+      "description": "As a user, I want to undo changes so that I can recover from mistakes.",
+      "acceptanceCriteria": [
+        "C-/ undoes the last editing operation",
+        "C-_ also triggers undo (alternative binding)",
+        "Undo supports multiple levels (at least 100 undo steps)",
+        "Undo restores both content and cursor position",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": "Store undo entries as snapshots of affected lines + cursor position. Keep it simple — full buffer snapshots are fine for small files."
+    },
+    {
+      "id": "US-013",
+      "title": "Incremental Search",
+      "description": "As a user, I want to search for text incrementally so that I can quickly find content in the file.",
+      "acceptanceCriteria": [
+        "C-s starts incremental search forward",
+        "Characters typed during search update the search query and jump to the next match",
+        "C-s again during search jumps to the next match",
+        "C-r starts incremental search backward",
+        "Enter or C-g exits search mode (C-g restores original cursor position)",
+        "The current match is visually highlighted",
+        "The search query is shown in the status line or a message area",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": true,
+      "notes": "Requires a search mode in the event loop state machine. Temporarily override key handling while in search mode."
+    }
+  ]
+}

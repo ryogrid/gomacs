@@ -43,10 +43,27 @@ func main() {
 	var message string      // message to display in message area
 	var prefixCx bool       // true when C-x prefix has been pressed
 	var quitWarned bool     // true after warning about unsaved changes on C-x C-c
+	var searchMode bool     // true when in incremental search
+	var searchForward bool  // true for forward search, false for backward
+	var searchQuery []rune  // current search query
+	var searchOrigR int     // cursor row before search started
+	var searchOrigC int     // cursor col before search started
+	var searchMatchR int    // row of current match (for highlight)
+	var searchMatchC int    // col of current match (for highlight)
+	var searchHasMatch bool // true if current query has a match
 
 	redraw := func() {
 		buf.AdjustScroll(viewHeight)
-		drawBuffer(screen, buf)
+		if searchMode && searchHasMatch {
+			drawBufferWithSearch(screen, buf, searchHighlight{
+				active:   true,
+				matchR:   searchMatchR,
+				matchC:   searchMatchC,
+				queryLen: len(searchQuery),
+			})
+		} else {
+			drawBuffer(screen, buf)
+		}
 		drawMessageLine(screen, message)
 		screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
 		screen.Show()
@@ -209,8 +226,21 @@ func textAreaHeight(screenHeight int) int {
 	return h
 }
 
+// searchHighlight holds the state for highlighting a search match during rendering.
+type searchHighlight struct {
+	active   bool
+	matchR   int
+	matchC   int
+	queryLen int
+}
+
 // drawBuffer renders the buffer content onto the screen, accounting for scroll offset.
 func drawBuffer(screen tcell.Screen, buf *Buffer) {
+	drawBufferWithSearch(screen, buf, searchHighlight{})
+}
+
+// drawBufferWithSearch renders the buffer with optional search match highlighting.
+func drawBufferWithSearch(screen tcell.Screen, buf *Buffer, sh searchHighlight) {
 	screen.Clear()
 	width, height := screen.Size()
 	textH := textAreaHeight(height)
@@ -224,6 +254,9 @@ func drawBuffer(screen tcell.Screen, buf *Buffer) {
 		for col := 0; col < width && col < len(line); col++ {
 			style := tcell.StyleDefault
 			if buf.InRegion(bufRow, col) {
+				style = style.Reverse(true)
+			}
+			if sh.active && bufRow == sh.matchR && col >= sh.matchC && col < sh.matchC+sh.queryLen {
 				style = style.Reverse(true)
 			}
 			screen.SetContent(col, row, line[col], nil, style)

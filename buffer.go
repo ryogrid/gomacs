@@ -489,6 +489,93 @@ func (b *Buffer) InRegion(row, col int) bool {
 	return true
 }
 
+// SearchForward searches forward from (startR, startC) for the given query.
+// Returns (row, col, found). The search wraps around the buffer.
+func (b *Buffer) SearchForward(query []rune, startR, startC int) (int, int, bool) {
+	if len(query) == 0 {
+		return startR, startC, false
+	}
+	numLines := len(b.Lines)
+	// Search from startR/startC forward, wrapping around
+	for i := 0; i < numLines; i++ {
+		row := (startR + i) % numLines
+		line := b.Lines[row]
+		fromCol := 0
+		if i == 0 {
+			fromCol = startC
+		}
+		col := indexRunes(line, query, fromCol)
+		if col >= 0 {
+			return row, col, true
+		}
+	}
+	return startR, startC, false
+}
+
+// SearchBackward searches backward from (startR, startC) for the given query.
+// Returns (row, col, found). The search wraps around the buffer.
+func (b *Buffer) SearchBackward(query []rune, startR, startC int) (int, int, bool) {
+	if len(query) == 0 {
+		return startR, startC, false
+	}
+	numLines := len(b.Lines)
+	for i := 0; i < numLines; i++ {
+		row := (startR - i + numLines) % numLines
+		line := b.Lines[row]
+		maxCol := len(line)
+		if i == 0 {
+			maxCol = startC
+		}
+		col := lastIndexRunes(line, query, maxCol)
+		if col >= 0 {
+			return row, col, true
+		}
+	}
+	return startR, startC, false
+}
+
+// indexRunes finds the first occurrence of needle in haystack starting at fromCol.
+// Returns the column index or -1 if not found.
+func indexRunes(haystack, needle []rune, fromCol int) int {
+	needleLen := len(needle)
+	for i := fromCol; i <= len(haystack)-needleLen; i++ {
+		match := true
+		for j := 0; j < needleLen; j++ {
+			if haystack[i+j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
+// lastIndexRunes finds the last occurrence of needle in haystack before maxCol.
+// maxCol is exclusive — matches must start before maxCol. Returns -1 if not found.
+func lastIndexRunes(haystack, needle []rune, maxCol int) int {
+	needleLen := len(needle)
+	start := maxCol - 1
+	if start > len(haystack)-needleLen {
+		start = len(haystack) - needleLen
+	}
+	for i := start; i >= 0; i-- {
+		match := true
+		for j := 0; j < needleLen; j++ {
+			if haystack[i+j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
 // DeleteChar deletes the character at the cursor (forward delete). If at the end of a line,
 // it joins the next line to the current one. This will be used by C-d in US-006.
 func (b *Buffer) DeleteChar() {

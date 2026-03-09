@@ -40,13 +40,50 @@ func main() {
 	screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
 	screen.Show()
 
+	var message string      // message to display in message area
+	var prefixCx bool       // true when C-x prefix has been pressed
+
+	redraw := func() {
+		buf.AdjustScroll(viewHeight)
+		drawBuffer(screen, buf)
+		drawMessageLine(screen, message)
+		screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
+		screen.Show()
+	}
+
 	for {
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
 			_, screenHeight = screen.Size()
 			viewHeight = textAreaHeight(screenHeight)
+			message = "" // clear message on next key
+
+			// Handle C-x prefix second key
+			if prefixCx {
+				prefixCx = false
+				switch ev.Key() {
+				case tcell.KeyCtrlS:
+					if err := buf.Save(); err != nil {
+						if err == errNoFilename {
+							message = "No file name"
+						} else {
+							message = fmt.Sprintf("Error saving: %v", err)
+						}
+					} else {
+						message = fmt.Sprintf("Saved %s", buf.Filename)
+					}
+				}
+				redraw()
+				continue
+			}
+
 			switch ev.Key() {
+			case tcell.KeyCtrlX:
+				prefixCx = true
+				message = "C-x-"
+				redraw()
+				continue
 			case tcell.KeyCtrlC:
 				return
 			case tcell.KeyCtrlF:
@@ -104,18 +141,12 @@ func main() {
 					}
 				}
 			}
-			buf.AdjustScroll(viewHeight)
-			drawBuffer(screen, buf)
-			screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
-			screen.Show()
+			redraw()
 		case *tcell.EventResize:
 			screen.Sync()
 			_, screenHeight = screen.Size()
 			viewHeight = textAreaHeight(screenHeight)
-			buf.AdjustScroll(viewHeight)
-			drawBuffer(screen, buf)
-			screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
-			screen.Show()
+			redraw()
 		}
 	}
 }
@@ -147,6 +178,21 @@ func drawBuffer(screen tcell.Screen, buf *Buffer) {
 	}
 
 	drawStatusLine(screen, buf)
+}
+
+// drawMessageLine renders a message on the last row of the screen.
+func drawMessageLine(screen tcell.Screen, msg string) {
+	width, height := screen.Size()
+	if height < 1 || msg == "" {
+		return
+	}
+	msgRow := height - 1
+	for i, ch := range []rune(msg) {
+		if i >= width {
+			break
+		}
+		screen.SetContent(i, msgRow, ch, nil, tcell.StyleDefault)
+	}
 }
 
 // drawStatusLine renders the status line on the second-to-last row with reverse video.

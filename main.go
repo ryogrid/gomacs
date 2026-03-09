@@ -42,6 +42,7 @@ func main() {
 
 	var message string      // message to display in message area
 	var prefixCx bool       // true when C-x prefix has been pressed
+	var quitWarned bool     // true after warning about unsaved changes on C-x C-c
 
 	redraw := func() {
 		buf.AdjustScroll(viewHeight)
@@ -59,6 +60,11 @@ func main() {
 			viewHeight = textAreaHeight(screenHeight)
 			message = "" // clear message on next key
 
+			// Reset quit warning unless we're in a C-x prefix sequence
+			if ev.Key() != tcell.KeyCtrlX && !prefixCx {
+				quitWarned = false
+			}
+
 			// Handle C-x prefix second key
 			if prefixCx {
 				prefixCx = false
@@ -73,6 +79,13 @@ func main() {
 					} else {
 						message = fmt.Sprintf("Saved %s", buf.Filename)
 					}
+				case tcell.KeyCtrlC:
+					if buf.Modified && !quitWarned {
+						message = "Modified buffers exist; exit anyway? (C-x C-c to confirm)"
+						quitWarned = true
+					} else {
+						return
+					}
 				}
 				redraw()
 				continue
@@ -84,8 +97,6 @@ func main() {
 				message = "C-x-"
 				redraw()
 				continue
-			case tcell.KeyCtrlC:
-				return
 			case tcell.KeyCtrlF:
 				buf.MoveForward()
 			case tcell.KeyCtrlB:

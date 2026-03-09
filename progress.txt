@@ -15,6 +15,10 @@
 - Regular character insertion in KeyRune case goes in the `else` branch after the Alt modifier check
 - Status line on row `height-2`, message area on row `height-1`; text area height = `textAreaHeight(screenHeight)` = `height - 2`
 - Use `tcell.StyleDefault.Reverse(true)` for status line reverse video styling
+- C-x prefix key: set `prefixCx = true`, show "C-x-" in message area, then handle second key on next event
+- Message area is on row `height-1`; drawn by `drawMessageLine(screen, msg)` after `drawBuffer`
+- Buffer.Save() writes to temp file then os.Rename for safe writes; clears Modified on success
+- `errNoFilename` is a package-level sentinel error for buffers with no filename
 
 ---
 
@@ -93,5 +97,22 @@
   - Status line uses `tcell.StyleDefault.Reverse(true)` for distinct background
   - Left side shows filename + modified state; right side shows cursor position
   - Cursor position displayed as 1-indexed (Line 1, Col 1) for user-friendliness
+
+---
+
+## 2026-03-09 - US-008
+- File save with C-x C-s prefix key handling
+- Added Buffer.Save() method with safe write (temp file + rename)
+- Added C-x prefix key state machine in event loop
+- Added message area display (drawMessageLine) on last row
+- Refactored redraw into a closure to reduce duplication
+- Files changed: buffer.go, main.go
+- **Learnings for future iterations:**
+  - C-x prefix works by setting a bool flag; next key event checks the flag and handles the second key
+  - Show "C-x-" in message area while waiting for second key to give user feedback
+  - Use `os.CreateTemp` in same directory + `os.Rename` for atomic-ish file save
+  - Message is cleared on next keypress by resetting the message string
+  - `errNoFilename` sentinel used to distinguish "no file" from actual write errors
+  - The `redraw` closure captures screen/buf/message/viewHeight to reduce repeated code
 
 ---

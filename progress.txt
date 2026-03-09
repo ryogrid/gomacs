@@ -6,6 +6,20 @@
 - Key event loop in main.go uses `switch ev.Key()` for dispatch
 - tcell.KeyCtrlSpace = 64 (iota + 64), tcell.KeyNUL = 0 (iota) — different constants
 - tcell input processor maps raw byte 0x00 to KeyCtrlSpace via `KeyCtrlSpace + Key(r)`
-- Windows Terminal on WSL2 may not deliver NUL byte for Ctrl+Space
+- Windows Terminal on WSL2: tcell's handleWinKey() drops Ctrl+Space because Uc=0 fails the `key != KeyRune || chr != 0` check
+- On standard Unix TTY: byte 0x00 maps to KeyCtrlSpace (64) via `KeyCtrlSpace + Key(r)` in input.go scan()
+- To fix C-SPC on Windows Terminal, handle KeyNUL (0) in addition to KeyCtrlSpace (64) in the main switch
 
+---
+
+## 2026-03-09 - US-001
+- Diagnosed C-SPC key event handling across terminals via tcell source code analysis
+- Added temporary debug logging to main.go (compiled successfully), then removed after diagnosis
+- **Root cause**: On Windows Terminal with win32-input-mode, Ctrl+Space sends Uc=0 (NUL byte). tcell's `handleWinKey()` in input.go silently drops the event because condition `key != KeyRune || chr != 0` is false when chr=0 and key=KeyRune. The event never reaches the application.
+- On standard Unix TTY path, byte 0x00 correctly maps to KeyCtrlSpace (64) via `KeyCtrlSpace + Key(r)` in scan()
+- Files changed: main.go (temporary debug logging added/removed), prd.json, progress.txt
+- **Learnings for future iterations:**
+  - tcell KeyCtrlSpace=64 and KeyNUL=0 are distinct constants defined in key.go
+  - The fix for US-002 should add `case tcell.KeyNUL:` alongside `case tcell.KeyCtrlSpace:` in main.go to catch both codes
+  - tcell source is in Go module cache at /home/ryo/go/pkg/mod/github.com/gdamore/tcell/v2@v2.13.8/
 ---

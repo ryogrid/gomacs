@@ -15,7 +15,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "tcell.KeyCtrlSpace is value 64, tcell.KeyNUL is value 0 — they are different constants. The terminal may send NUL (0x00) which could map to either, or may not send anything at all."
     },
     {

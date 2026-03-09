@@ -2,7 +2,7 @@
 - Buffer is stored as `[][]rune` (Lines field), one slice per line
 - Buffer tracks cursor via `CursorR`/`CursorC` fields
 - Mark/Region: `MarkR`, `MarkC`, `MarkActive` on Buffer; `SetMark()`, `DeactivateMark()`, `KillRegion()`, `CopyRegion()`
-- C-SPC currently handled at main.go:287 as `tcell.KeyCtrlSpace`
+- C-SPC handled at main.go:287 as `tcell.KeyCtrlSpace, tcell.KeyNUL` (both key codes)
 - Key event loop in main.go uses `switch ev.Key()` for dispatch
 - tcell.KeyCtrlSpace = 64 (iota + 64), tcell.KeyNUL = 0 (iota) — different constants
 - tcell input processor maps raw byte 0x00 to KeyCtrlSpace via `KeyCtrlSpace + Key(r)`
@@ -22,4 +22,14 @@
   - tcell KeyCtrlSpace=64 and KeyNUL=0 are distinct constants defined in key.go
   - The fix for US-002 should add `case tcell.KeyNUL:` alongside `case tcell.KeyCtrlSpace:` in main.go to catch both codes
   - tcell source is in Go module cache at /home/ryo/go/pkg/mod/github.com/gdamore/tcell/v2@v2.13.8/
+---
+
+## 2026-03-10 - US-002
+- Added `tcell.KeyNUL` to the `case tcell.KeyCtrlSpace` in main.go switch statement
+- This ensures C-SPC works on Windows Terminal / WSL2 where the key arrives as KeyNUL (0) instead of KeyCtrlSpace (64)
+- Files changed: main.go (1 line change), prd.json, progress.txt
+- All tests pass, typecheck passes
+- **Learnings for future iterations:**
+  - Fix was minimal: just adding a second case value to the existing switch case
+  - The tcell library's win32-input-mode path may silently drop the event, but handling KeyNUL covers cases where it does arrive
 ---

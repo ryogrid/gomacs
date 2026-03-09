@@ -284,7 +284,7 @@ func main() {
 				continue
 			case tcell.KeyCtrlV:
 				buf.ScrollDown(viewHeight)
-			case tcell.KeyCtrlSpace:
+			case tcell.KeyCtrlSpace, tcell.KeyNUL:
 				buf.SetMark()
 				message = "Mark set"
 			case tcell.KeyCtrlG:

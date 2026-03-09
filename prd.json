@@ -202,7 +202,7 @@
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "Store undo entries as snapshots of affected lines + cursor position. Keep it simple — full buffer snapshots are fine for small files."
     },
     {

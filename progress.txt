@@ -162,5 +162,22 @@
   - KillRegion/CopyRegion both deactivate the mark after operation
   - C-SPC maps to `tcell.KeyCtrlSpace` in tcell
   - C-g mapped to `tcell.KeyCtrlG` — useful as a general cancel key
+- Undo uses full buffer snapshots (undoEntry with Lines + cursor); max 100 entries
+- `SaveUndo()` is called in the event loop before each editing command, not inside buffer methods (keeps compound ops like Yank as single undo)
+- C-/ and C-_ both map to `tcell.KeyCtrlUnderscore` (same terminal code 0x1F)
+
+---
+
+## 2026-03-09 - US-012
+- Undo: C-/ (C-_) undoes the last editing operation, supports 100+ levels
+- Added undoEntry struct with Lines snapshot + cursor position
+- Added SaveUndo() and Undo() methods on Buffer
+- SaveUndo() called in event loop before each editing command (InsertChar, InsertNewline, Backspace, DeleteChar, KillLine, KillRegion, Yank)
+- Added 7 unit tests covering insert, newline, backspace, multi-level, empty stack, kill line, and max entries
+- Files changed: buffer.go, buffer_test.go, main.go
+- **Learnings for future iterations:**
+  - C-/ and C-_ produce the same terminal code (0x1F), handled by `tcell.KeyCtrlUnderscore`
+  - SaveUndo should be called at the command level in the event loop, not inside individual buffer methods, so compound operations (like Yank which calls InsertChar/InsertNewline) are a single undo entry
+  - Full buffer snapshots (deep copy of Lines) are simple and correct; for large files a more efficient approach would be needed
 
 ---

@@ -33,7 +33,8 @@ func main() {
 	}
 	defer screen.Fini()
 
-	_, viewHeight := screen.Size()
+	_, screenHeight := screen.Size()
+	viewHeight := textAreaHeight(screenHeight)
 	buf.AdjustScroll(viewHeight)
 	drawBuffer(screen, buf)
 	screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
@@ -43,7 +44,8 @@ func main() {
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
-			_, viewHeight = screen.Size()
+			_, screenHeight = screen.Size()
+			viewHeight = textAreaHeight(screenHeight)
 			switch ev.Key() {
 			case tcell.KeyCtrlC:
 				return
@@ -108,7 +110,8 @@ func main() {
 			screen.Show()
 		case *tcell.EventResize:
 			screen.Sync()
-			_, viewHeight = screen.Size()
+			_, screenHeight = screen.Size()
+			viewHeight = textAreaHeight(screenHeight)
 			buf.AdjustScroll(viewHeight)
 			drawBuffer(screen, buf)
 			screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
@@ -117,12 +120,22 @@ func main() {
 	}
 }
 
+// textAreaHeight returns the number of rows available for text (excluding status and message lines).
+func textAreaHeight(screenHeight int) int {
+	h := screenHeight - 2
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
 // drawBuffer renders the buffer content onto the screen, accounting for scroll offset.
 func drawBuffer(screen tcell.Screen, buf *Buffer) {
 	screen.Clear()
 	width, height := screen.Size()
+	textH := textAreaHeight(height)
 
-	for row := 0; row < height; row++ {
+	for row := 0; row < textH; row++ {
 		bufRow := row + buf.ScrollOffset
 		if bufRow >= len(buf.Lines) {
 			break
@@ -131,5 +144,54 @@ func drawBuffer(screen tcell.Screen, buf *Buffer) {
 		for col := 0; col < width && col < len(line); col++ {
 			screen.SetContent(col, row, line[col], nil, tcell.StyleDefault)
 		}
+	}
+
+	drawStatusLine(screen, buf)
+}
+
+// drawStatusLine renders the status line on the second-to-last row with reverse video.
+func drawStatusLine(screen tcell.Screen, buf *Buffer) {
+	width, height := screen.Size()
+	if height < 2 {
+		return
+	}
+	statusRow := height - 2
+
+	name := buf.Filename
+	if name == "" {
+		name = "[No Name]"
+	}
+	mod := ""
+	if buf.Modified {
+		mod = " [Modified]"
+	}
+	pos := fmt.Sprintf("Line %d, Col %d", buf.CursorR+1, buf.CursorC+1)
+	left := fmt.Sprintf(" %s%s", name, mod)
+	right := fmt.Sprintf("%s ", pos)
+
+	style := tcell.StyleDefault.Reverse(true)
+
+	// Fill entire status line with reverse video
+	for col := 0; col < width; col++ {
+		screen.SetContent(col, statusRow, ' ', nil, style)
+	}
+	// Draw left-aligned text
+	for i, ch := range []rune(left) {
+		if i >= width {
+			break
+		}
+		screen.SetContent(i, statusRow, ch, nil, style)
+	}
+	// Draw right-aligned text
+	startCol := width - len([]rune(right))
+	if startCol < len([]rune(left)) {
+		startCol = len([]rune(left))
+	}
+	for i, ch := range []rune(right) {
+		col := startCol + i
+		if col >= width {
+			break
+		}
+		screen.SetContent(col, statusRow, ch, nil, style)
 	}
 }

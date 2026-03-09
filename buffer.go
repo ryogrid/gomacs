@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -215,6 +217,45 @@ func (b *Buffer) AdjustScroll(viewHeight int) {
 		b.ScrollOffset = b.CursorR - viewHeight + 1
 	}
 }
+
+// Save writes the buffer contents to disk. It writes to a temp file first, then renames
+// for safety. Returns an error if the buffer has no filename or the write fails.
+func (b *Buffer) Save() error {
+	if b.Filename == "" {
+		return errNoFilename
+	}
+	var sb strings.Builder
+	for i, line := range b.Lines {
+		sb.WriteString(string(line))
+		if i < len(b.Lines)-1 {
+			sb.WriteByte('\n')
+		}
+	}
+	sb.WriteByte('\n') // trailing newline
+
+	dir := filepath.Dir(b.Filename)
+	tmp, err := os.CreateTemp(dir, ".gomacs-save-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	_, err = tmp.WriteString(sb.String())
+	if err2 := tmp.Close(); err == nil {
+		err = err2
+	}
+	if err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	if err := os.Rename(tmpName, b.Filename); err != nil {
+		os.Remove(tmpName)
+		return err
+	}
+	b.Modified = false
+	return nil
+}
+
+var errNoFilename = fmt.Errorf("no filename")
 
 // DeleteChar deletes the character at the cursor (forward delete). If at the end of a line,
 // it joins the next line to the current one. This will be used by C-d in US-006.

@@ -7,6 +7,10 @@
 - `drawBuffer(screen, buf)` renders buffer to tcell screen, must call `screen.Show()` after
 - Long lines truncated at screen width, lines beyond screen height not rendered
 - Use `os.ReadFile` + `strings.Split` for file loading, trim trailing newline first
+- Buffer tracks `ScrollOffset` (top visible line); use `AdjustScroll(viewHeight)` after cursor changes
+- Cursor display uses `screen.ShowCursor(buf.CursorC, buf.CursorR - buf.ScrollOffset)` to account for scroll
+- `drawBuffer` renders from `buf.ScrollOffset`, mapping buffer row to screen row via `bufRow = screenRow + ScrollOffset`
+- Alt key bindings use `ev.Modifiers()&tcell.ModAlt != 0` with `ev.Rune()` check; also handle Esc-prefix for terminals
 
 ---
 

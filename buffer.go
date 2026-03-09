@@ -1,5 +1,10 @@
 package main
 
+import (
+	"os"
+	"strings"
+)
+
 // Buffer holds the text content as a slice of lines, where each line is a slice of runes.
 type Buffer struct {
 	Lines    [][]rune
@@ -14,6 +19,29 @@ func NewBuffer() *Buffer {
 	return &Buffer{
 		Lines: [][]rune{{}},
 	}
+}
+
+// NewBufferFromFile loads a file into a new buffer. Returns an error if the file cannot be read.
+func NewBufferFromFile(filename string) (*Buffer, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	content := string(data)
+	// Remove trailing newline to avoid an extra empty line at the end.
+	content = strings.TrimSuffix(content, "\n")
+	rawLines := strings.Split(content, "\n")
+	lines := make([][]rune, len(rawLines))
+	for i, rl := range rawLines {
+		lines[i] = []rune(rl)
+	}
+	if len(lines) == 0 {
+		lines = [][]rune{{}}
+	}
+	return &Buffer{
+		Lines:    lines,
+		Filename: filename,
+	}, nil
 }
 
 // InsertChar inserts a rune at the current cursor position and advances the cursor.

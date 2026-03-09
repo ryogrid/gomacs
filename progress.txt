@@ -1,6 +1,8 @@
 ## Codebase Patterns
 - Buffer is stored as `[][]rune` (Lines field), one slice per line
 - Buffer tracks cursor via `CursorR`/`CursorC` fields
+- Cursor movement methods on Buffer: MoveForward, MoveBackward, MoveUp, MoveDown, MoveBeginningOfLine, MoveEndOfLine
+- Use `screen.ShowCursor(col, row)` to position the terminal cursor
 - `NewBuffer()` creates empty buffer, `NewBufferFromFile(filename)` loads from disk
 - `drawBuffer(screen, buf)` renders buffer to tcell screen, must call `screen.Show()` after
 - Long lines truncated at screen width, lines beyond screen height not rendered
@@ -32,5 +34,17 @@
   - `drawBuffer` clears screen, then renders visible lines/cols within screen bounds
   - File loading trims trailing newline to avoid extra empty line
   - Resize events need `screen.Sync()` then re-render
+
+---
+
+## 2026-03-09 - US-004
+- Basic cursor movement with Emacs keybindings (C-f, C-b, C-n, C-p, C-a, C-e) and arrow keys
+- Added 6 movement methods to Buffer: MoveForward, MoveBackward, MoveUp, MoveDown, MoveBeginningOfLine, MoveEndOfLine
+- Cursor wraps between lines on forward/backward; clamps column when moving up/down to shorter lines
+- Files changed: buffer.go, buffer_test.go, main.go
+- **Learnings for future iterations:**
+  - `screen.ShowCursor(col, row)` must be called after every redraw to position the hardware cursor
+  - Cursor movement methods live on Buffer since they depend on buffer state (line lengths, bounds)
+  - When moving up/down, cursor column must be clamped to the target line's length
 
 ---

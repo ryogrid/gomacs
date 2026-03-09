@@ -196,6 +196,147 @@ func TestDeleteCharEndOfLine(t *testing.T) {
 	}
 }
 
+// --- Cursor Movement Tests ---
+
+func TestMoveForward(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 0
+
+	b.MoveForward()
+	if b.CursorC != 1 {
+		t.Fatalf("cursor col = %d, want 1", b.CursorC)
+	}
+
+	// Move to end of line
+	b.CursorC = 3
+	b.MoveForward() // should not move (single line)
+	if b.CursorR != 0 || b.CursorC != 3 {
+		t.Fatalf("cursor = (%d,%d), want (0,3)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveForwardWraps(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("ab", "cd")
+	b.CursorC = 2
+
+	b.MoveForward() // should wrap to next line
+	if b.CursorR != 1 || b.CursorC != 0 {
+		t.Fatalf("cursor = (%d,%d), want (1,0)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveBackward(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 2
+
+	b.MoveBackward()
+	if b.CursorC != 1 {
+		t.Fatalf("cursor col = %d, want 1", b.CursorC)
+	}
+
+	// At beginning, should not move
+	b.CursorC = 0
+	b.MoveBackward()
+	if b.CursorR != 0 || b.CursorC != 0 {
+		t.Fatalf("cursor = (%d,%d), want (0,0)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveBackwardWraps(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("ab", "cd")
+	b.CursorR = 1
+	b.CursorC = 0
+
+	b.MoveBackward() // should wrap to end of previous line
+	if b.CursorR != 0 || b.CursorC != 2 {
+		t.Fatalf("cursor = (%d,%d), want (0,2)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveUp(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "de")
+	b.CursorR = 1
+	b.CursorC = 1
+
+	b.MoveUp()
+	if b.CursorR != 0 || b.CursorC != 1 {
+		t.Fatalf("cursor = (%d,%d), want (0,1)", b.CursorR, b.CursorC)
+	}
+
+	// At top, should not move
+	b.MoveUp()
+	if b.CursorR != 0 {
+		t.Fatalf("cursor row = %d, want 0", b.CursorR)
+	}
+}
+
+func TestMoveUpClampsCursor(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("ab", "cdef")
+	b.CursorR = 1
+	b.CursorC = 4
+
+	b.MoveUp() // shorter line, should clamp
+	if b.CursorR != 0 || b.CursorC != 2 {
+		t.Fatalf("cursor = (%d,%d), want (0,2)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveDown(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "de")
+	b.CursorC = 1
+
+	b.MoveDown()
+	if b.CursorR != 1 || b.CursorC != 1 {
+		t.Fatalf("cursor = (%d,%d), want (1,1)", b.CursorR, b.CursorC)
+	}
+
+	// At bottom, should not move
+	b.MoveDown()
+	if b.CursorR != 1 {
+		t.Fatalf("cursor row = %d, want 1", b.CursorR)
+	}
+}
+
+func TestMoveDownClampsCursor(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abcd", "ef")
+	b.CursorC = 4
+
+	b.MoveDown() // shorter line, should clamp
+	if b.CursorR != 1 || b.CursorC != 2 {
+		t.Fatalf("cursor = (%d,%d), want (1,2)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveBeginningOfLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 2
+
+	b.MoveBeginningOfLine()
+	if b.CursorC != 0 {
+		t.Fatalf("cursor col = %d, want 0", b.CursorC)
+	}
+}
+
+func TestMoveEndOfLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 0
+
+	b.MoveEndOfLine()
+	if b.CursorC != 3 {
+		t.Fatalf("cursor col = %d, want 3", b.CursorC)
+	}
+}
+
 func TestDeleteCharEndOfBuffer(t *testing.T) {
 	b := NewBuffer()
 	b.Lines = lines("abc")

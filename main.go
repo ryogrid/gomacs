@@ -34,18 +34,44 @@ func main() {
 	defer screen.Fini()
 
 	drawBuffer(screen, buf)
+	screen.ShowCursor(buf.CursorC, buf.CursorR)
 	screen.Show()
 
 	for {
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
 		case *tcell.EventKey:
-			if ev.Key() == tcell.KeyCtrlC {
+			switch ev.Key() {
+			case tcell.KeyCtrlC:
 				return
+			case tcell.KeyCtrlF:
+				buf.MoveForward()
+			case tcell.KeyCtrlB:
+				buf.MoveBackward()
+			case tcell.KeyCtrlN:
+				buf.MoveDown()
+			case tcell.KeyCtrlP:
+				buf.MoveUp()
+			case tcell.KeyCtrlA:
+				buf.MoveBeginningOfLine()
+			case tcell.KeyCtrlE:
+				buf.MoveEndOfLine()
+			case tcell.KeyRight:
+				buf.MoveForward()
+			case tcell.KeyLeft:
+				buf.MoveBackward()
+			case tcell.KeyDown:
+				buf.MoveDown()
+			case tcell.KeyUp:
+				buf.MoveUp()
 			}
+			drawBuffer(screen, buf)
+			screen.ShowCursor(buf.CursorC, buf.CursorR)
+			screen.Show()
 		case *tcell.EventResize:
 			screen.Sync()
 			drawBuffer(screen, buf)
+			screen.ShowCursor(buf.CursorC, buf.CursorR)
 			screen.Show()
 		}
 	}

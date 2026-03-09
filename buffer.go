@@ -108,6 +108,56 @@ func (b *Buffer) Backspace() {
 	}
 }
 
+// MoveForward moves the cursor forward one character.
+func (b *Buffer) MoveForward() {
+	if b.CursorC < len(b.Lines[b.CursorR]) {
+		b.CursorC++
+	} else if b.CursorR < len(b.Lines)-1 {
+		b.CursorR++
+		b.CursorC = 0
+	}
+}
+
+// MoveBackward moves the cursor backward one character.
+func (b *Buffer) MoveBackward() {
+	if b.CursorC > 0 {
+		b.CursorC--
+	} else if b.CursorR > 0 {
+		b.CursorR--
+		b.CursorC = len(b.Lines[b.CursorR])
+	}
+}
+
+// MoveUp moves the cursor up one line.
+func (b *Buffer) MoveUp() {
+	if b.CursorR > 0 {
+		b.CursorR--
+		if b.CursorC > len(b.Lines[b.CursorR]) {
+			b.CursorC = len(b.Lines[b.CursorR])
+		}
+	}
+}
+
+// MoveDown moves the cursor down one line.
+func (b *Buffer) MoveDown() {
+	if b.CursorR < len(b.Lines)-1 {
+		b.CursorR++
+		if b.CursorC > len(b.Lines[b.CursorR]) {
+			b.CursorC = len(b.Lines[b.CursorR])
+		}
+	}
+}
+
+// MoveBeginningOfLine moves the cursor to the beginning of the current line.
+func (b *Buffer) MoveBeginningOfLine() {
+	b.CursorC = 0
+}
+
+// MoveEndOfLine moves the cursor to the end of the current line.
+func (b *Buffer) MoveEndOfLine() {
+	b.CursorC = len(b.Lines[b.CursorR])
+}
+
 // DeleteChar deletes the character at the cursor (forward delete). If at the end of a line,
 // it joins the next line to the current one. This will be used by C-d in US-006.
 func (b *Buffer) DeleteChar() {

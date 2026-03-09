@@ -1,0 +1,36 @@
+## Codebase Patterns
+- Buffer is stored as `[][]rune` (Lines field), one slice per line
+- Buffer tracks cursor via `CursorR`/`CursorC` fields
+- `NewBuffer()` creates empty buffer, `NewBufferFromFile(filename)` loads from disk
+- `drawBuffer(screen, buf)` renders buffer to tcell screen, must call `screen.Show()` after
+- Long lines truncated at screen width, lines beyond screen height not rendered
+- Use `os.ReadFile` + `strings.Split` for file loading, trim trailing newline first
+
+---
+
+## 2026-03-09 - US-001
+- Project scaffolding: go.mod, tcell dependency, main.go with screen init and C-c exit
+- Files: go.mod, go.sum, main.go, .gitignore
+
+---
+
+## 2026-03-09 - US-002
+- Buffer data structure with insert char, insert newline, backspace, delete char
+- Files: buffer.go, buffer_test.go
+- **Learnings for future iterations:**
+  - Buffer uses `[][]rune` for proper Unicode support
+  - All buffer mutations set `Modified = true`
+
+---
+
+## 2026-03-09 - US-003
+- File open from CLI args and display on tcell screen
+- Added `NewBufferFromFile()` to buffer.go
+- Added `drawBuffer()` to main.go for rendering
+- Files changed: buffer.go, main.go
+- **Learnings for future iterations:**
+  - `drawBuffer` clears screen, then renders visible lines/cols within screen bounds
+  - File loading trims trailing newline to avoid extra empty line
+  - Resize events need `screen.Sync()` then re-render
+
+---

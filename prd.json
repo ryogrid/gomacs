@@ -50,7 +50,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Integrate buffer with tcell screen rendering. Read file via os.ReadFile, split by newline."
     },
     {

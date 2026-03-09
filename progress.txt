@@ -13,6 +13,8 @@
 - Alt key bindings use `ev.Modifiers()&tcell.ModAlt != 0` with `ev.Rune()` check; also handle Esc-prefix for terminals
 - Handle both `tcell.KeyBackspace` and `tcell.KeyBackspace2` for cross-terminal compatibility
 - Regular character insertion in KeyRune case goes in the `else` branch after the Alt modifier check
+- Status line on row `height-2`, message area on row `height-1`; text area height = `textAreaHeight(screenHeight)` = `height - 2`
+- Use `tcell.StyleDefault.Reverse(true)` for status line reverse video styling
 
 ---
 
@@ -77,5 +79,19 @@
   - Screen cursor position must subtract ScrollOffset: `ShowCursor(col, cursorR - scrollOffset)`
   - Alt/Meta keybindings need dual handling: ModAlt flag and Esc-prefix sequence
   - Page scroll moves cursor into viewport if it would be off-screen
+
+---
+
+## 2026-03-09 - US-007
+- Status line displayed on second-to-last row with reverse video
+- Shows filename (or [No Name]), [Modified] indicator, and Line X, Col Y position
+- Text area height reduced to `height - 2` to reserve status line and message area rows
+- Added `textAreaHeight()` helper; all viewHeight calculations now use it
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - `textAreaHeight(screenHeight)` returns `screenHeight - 2` (status + message area)
+  - Status line uses `tcell.StyleDefault.Reverse(true)` for distinct background
+  - Left side shows filename + modified state; right side shows cursor position
+  - Cursor position displayed as 1-indexed (Line 1, Col 1) for user-friendliness
 
 ---

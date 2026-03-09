@@ -123,18 +123,30 @@ func main() {
 				buf.DeactivateMark()
 				message = ""
 			case tcell.KeyCtrlW:
+				buf.SaveUndo()
 				buf.KillRegion()
+			case tcell.KeyCtrlUnderscore:
+				if buf.Undo() {
+					message = "Undo"
+				} else {
+					message = "No further undo information"
+				}
 			case tcell.KeyCtrlK:
+				buf.SaveUndo()
 				buf.KillLine()
 				redraw()
 				continue
 			case tcell.KeyCtrlY:
+				buf.SaveUndo()
 				buf.Yank()
 			case tcell.KeyCtrlD:
+				buf.SaveUndo()
 				buf.DeleteChar()
 			case tcell.KeyEnter:
+				buf.SaveUndo()
 				buf.InsertNewline()
 			case tcell.KeyBackspace, tcell.KeyBackspace2:
+				buf.SaveUndo()
 				buf.Backspace()
 			case tcell.KeyRight:
 				buf.MoveForward()
@@ -158,6 +170,7 @@ func main() {
 						buf.MoveEndOfBuffer()
 					}
 				} else {
+					buf.SaveUndo()
 					buf.InsertChar(ev.Rune())
 				}
 			case tcell.KeyEsc:

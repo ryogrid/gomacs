@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+// undoEntry stores a snapshot of buffer state for undo.
+type undoEntry struct {
+	Lines   [][]rune
+	CursorR int
+	CursorC int
+}
+
+const maxUndoEntries = 100
+
 // Buffer holds the text content as a slice of lines, where each line is a slice of runes.
 type Buffer struct {
 	Lines        [][]rune
@@ -20,6 +29,7 @@ type Buffer struct {
 	MarkR        int      // mark row
 	MarkC        int      // mark column
 	MarkActive   bool     // true when mark is set and region is active
+	UndoStack    []undoEntry
 }
 
 // NewBuffer creates a new empty buffer with one empty line.
@@ -261,6 +271,40 @@ func (b *Buffer) Save() error {
 }
 
 var errNoFilename = fmt.Errorf("no filename")
+
+// SaveUndo saves the current buffer state onto the undo stack.
+// Call this before any editing operation.
+func (b *Buffer) SaveUndo() {
+	snapshot := undoEntry{
+		Lines:   make([][]rune, len(b.Lines)),
+		CursorR: b.CursorR,
+		CursorC: b.CursorC,
+	}
+	for i, line := range b.Lines {
+		cp := make([]rune, len(line))
+		copy(cp, line)
+		snapshot.Lines[i] = cp
+	}
+	b.UndoStack = append(b.UndoStack, snapshot)
+	if len(b.UndoStack) > maxUndoEntries {
+		b.UndoStack = b.UndoStack[len(b.UndoStack)-maxUndoEntries:]
+	}
+}
+
+// Undo restores the buffer to the most recent undo snapshot.
+// Returns true if undo was performed, false if nothing to undo.
+func (b *Buffer) Undo() bool {
+	if len(b.UndoStack) == 0 {
+		return false
+	}
+	entry := b.UndoStack[len(b.UndoStack)-1]
+	b.UndoStack = b.UndoStack[:len(b.UndoStack)-1]
+	b.Lines = entry.Lines
+	b.CursorR = entry.CursorR
+	b.CursorC = entry.CursorC
+	b.Modified = true
+	return true
+}
 
 // KillLine kills text from cursor to end of line (C-k). If cursor is at end of line,
 // kills the newline (joins with next line). Consecutive kills append to the kill ring entry.

@@ -787,6 +787,169 @@ func TestKillRegionInactive(t *testing.T) {
 	}
 }
 
+// --- Undo Tests ---
+
+func TestUndoInsertChar(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 3
+
+	b.SaveUndo()
+	b.InsertChar('d')
+
+	got := bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abcd"}) {
+		t.Fatalf("after insert got %v", got)
+	}
+
+	ok := b.Undo()
+	if !ok {
+		t.Fatal("undo should succeed")
+	}
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abc"}) {
+		t.Fatalf("after undo got %v, want [\"abc\"]", got)
+	}
+	if b.CursorC != 3 {
+		t.Fatalf("cursor col = %d, want 3", b.CursorC)
+	}
+}
+
+func TestUndoInsertNewline(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 5
+
+	b.SaveUndo()
+	b.InsertNewline()
+
+	got := bufLines(b)
+	if !reflect.DeepEqual(got, []string{"Hello", " World"}) {
+		t.Fatalf("after insert newline got %v", got)
+	}
+
+	b.Undo()
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"Hello World"}) {
+		t.Fatalf("after undo got %v", got)
+	}
+	if b.CursorC != 5 {
+		t.Fatalf("cursor col = %d, want 5", b.CursorC)
+	}
+}
+
+func TestUndoBackspace(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 2
+
+	b.SaveUndo()
+	b.Backspace()
+
+	got := bufLines(b)
+	if !reflect.DeepEqual(got, []string{"ac"}) {
+		t.Fatalf("after backspace got %v", got)
+	}
+
+	b.Undo()
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abc"}) {
+		t.Fatalf("after undo got %v", got)
+	}
+	if b.CursorC != 2 {
+		t.Fatalf("cursor col = %d, want 2", b.CursorC)
+	}
+}
+
+func TestUndoMultipleLevels(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 3
+
+	b.SaveUndo()
+	b.InsertChar('d')
+	b.SaveUndo()
+	b.InsertChar('e')
+	b.SaveUndo()
+	b.InsertChar('f')
+
+	got := bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abcdef"}) {
+		t.Fatalf("after inserts got %v", got)
+	}
+
+	b.Undo()
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abcde"}) {
+		t.Fatalf("after first undo got %v", got)
+	}
+
+	b.Undo()
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abcd"}) {
+		t.Fatalf("after second undo got %v", got)
+	}
+
+	b.Undo()
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"abc"}) {
+		t.Fatalf("after third undo got %v", got)
+	}
+}
+
+func TestUndoEmptyStack(t *testing.T) {
+	b := NewBuffer()
+	ok := b.Undo()
+	if ok {
+		t.Fatal("undo on empty stack should return false")
+	}
+}
+
+func TestUndoKillLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 5
+
+	b.SaveUndo()
+	b.KillLine()
+
+	got := bufLines(b)
+	if !reflect.DeepEqual(got, []string{"Hello"}) {
+		t.Fatalf("after kill got %v", got)
+	}
+
+	b.Undo()
+	got = bufLines(b)
+	if !reflect.DeepEqual(got, []string{"Hello World"}) {
+		t.Fatalf("after undo got %v", got)
+	}
+}
+
+func TestUndoMaxEntries(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("")
+	b.CursorC = 0
+
+	// Save more than maxUndoEntries
+	for i := 0; i < 150; i++ {
+		b.SaveUndo()
+		b.InsertChar('x')
+	}
+
+	if len(b.UndoStack) != 100 {
+		t.Fatalf("undo stack size = %d, want 100", len(b.UndoStack))
+	}
+
+	// Should be able to undo 100 times
+	count := 0
+	for b.Undo() {
+		count++
+	}
+	if count != 100 {
+		t.Fatalf("undo count = %d, want 100", count)
+	}
+}
+
 func TestKillLineEndOfBuffer(t *testing.T) {
 	b := NewBuffer()
 	b.Lines = lines("abc")

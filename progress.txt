@@ -176,8 +176,31 @@
 - Added 7 unit tests covering insert, newline, backspace, multi-level, empty stack, kill line, and max entries
 - Files changed: buffer.go, buffer_test.go, main.go
 - **Learnings for future iterations:**
-  - C-/ and C-_ produce the same terminal code (0x1F), handled by `tcell.KeyCtrlUnderscore`
+  - Search mode: `searchMode` bool in event loop; search keys handled before normal keys, other keys exit search and re-post via `screen.PostEvent(ev)`
+- `SearchForward`/`SearchBackward` on Buffer with wrap-around; `indexRunes`/`lastIndexRunes` helpers
+- Search highlight uses `searchHighlight` struct passed to `drawBufferWithSearch`
+- C-/ and C-_ produce the same terminal code (0x1F), handled by `tcell.KeyCtrlUnderscore`
   - SaveUndo should be called at the command level in the event loop, not inside individual buffer methods, so compound operations (like Yank which calls InsertChar/InsertNewline) are a single undo entry
   - Full buffer snapshots (deep copy of Lines) are simple and correct; for large files a more efficient approach would be needed
+
+---
+
+## 2026-03-09 - US-013
+- Incremental Search: C-s starts forward search, C-r starts backward search
+- Added SearchForward/SearchBackward methods on Buffer with wrap-around
+- Added indexRunes/lastIndexRunes helper functions for rune-based substring search
+- Search mode in event loop: typing updates query and jumps to match, C-s/C-r cycle matches
+- Enter exits search at current position, C-g cancels and restores original position
+- Backspace removes last query char and re-searches from original position
+- Current match highlighted with reverse video via searchHighlight struct
+- Search query shown in message area ("I-search: ..." or "Failing I-search: ...")
+- Non-search keys exit search mode and are re-posted via screen.PostEvent for normal handling
+- Added 10 unit tests for SearchForward and SearchBackward
+- Files changed: buffer.go, buffer_test.go, main.go
+- **Learnings for future iterations:**
+  - Search mode intercepts keys before normal event handling; use `continue` to skip normal processing
+  - Use `screen.PostEvent(ev)` to re-post unhandled keys when exiting search mode so they get processed normally
+  - Wrap-around search iterates all lines starting from current position, using modular arithmetic
+  - `drawBufferWithSearch` extends `drawBuffer` with optional match highlighting via a struct parameter
 
 ---

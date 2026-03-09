@@ -220,7 +220,7 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "Requires a search mode in the event loop state machine. Temporarily override key handling while in search mode."
     }
   ]

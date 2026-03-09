@@ -52,3 +52,16 @@
   - When moving up/down, cursor column must be clamped to the target line's length
 
 ---
+
+## 2026-03-09 - US-005
+- Scrolling and viewport: ScrollOffset tracked in Buffer, AdjustScroll keeps cursor visible
+- ScrollDown/ScrollUp for page scrolling (C-v / M-v), MoveBeginningOfBuffer/MoveEndOfBuffer (M-< / M->)
+- drawBuffer renders from ScrollOffset; cursor display adjusted by offset
+- Esc-prefix handling for terminals that don't send ModAlt
+- Files changed: buffer.go, buffer_test.go, main.go
+- **Learnings for future iterations:**
+  - Screen cursor position must subtract ScrollOffset: `ShowCursor(col, cursorR - scrollOffset)`
+  - Alt/Meta keybindings need dual handling: ModAlt flag and Esc-prefix sequence
+  - Page scroll moves cursor into viewport if it would be off-screen
+
+---

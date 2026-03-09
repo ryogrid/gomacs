@@ -116,6 +116,14 @@ func main() {
 				buf.MoveEndOfLine()
 			case tcell.KeyCtrlV:
 				buf.ScrollDown(viewHeight)
+			case tcell.KeyCtrlSpace:
+				buf.SetMark()
+				message = "Mark set"
+			case tcell.KeyCtrlG:
+				buf.DeactivateMark()
+				message = ""
+			case tcell.KeyCtrlW:
+				buf.KillRegion()
 			case tcell.KeyCtrlK:
 				buf.KillLine()
 				redraw()
@@ -195,7 +203,11 @@ func drawBuffer(screen tcell.Screen, buf *Buffer) {
 		}
 		line := buf.Lines[bufRow]
 		for col := 0; col < width && col < len(line); col++ {
-			screen.SetContent(col, row, line[col], nil, tcell.StyleDefault)
+			style := tcell.StyleDefault
+			if buf.InRegion(bufRow, col) {
+				style = style.Reverse(true)
+			}
+			screen.SetContent(col, row, line[col], nil, style)
 		}
 	}
 

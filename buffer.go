@@ -17,6 +17,9 @@ type Buffer struct {
 	Filename     string
 	KillRing     [][]rune // kill ring entries (each entry is a sequence of runes, newlines included)
 	lastKill     bool     // true if the last operation was a kill (for appending consecutive kills)
+	MarkR        int      // mark row
+	MarkC        int      // mark column
+	MarkActive   bool     // true when mark is set and region is active
 }
 
 // NewBuffer creates a new empty buffer with one empty line.
@@ -320,6 +323,126 @@ func (b *Buffer) Yank() {
 			b.InsertChar(ch)
 		}
 	}
+}
+
+// SetMark sets the mark at the current cursor position and activates the region.
+func (b *Buffer) SetMark() {
+	b.MarkR = b.CursorR
+	b.MarkC = b.CursorC
+	b.MarkActive = true
+}
+
+// DeactivateMark deactivates the mark (cancels selection).
+func (b *Buffer) DeactivateMark() {
+	b.MarkActive = false
+}
+
+// regionBounds returns the start and end positions of the region (mark to point),
+// ordered so that start <= end. Returns (startR, startC, endR, endC).
+func (b *Buffer) regionBounds() (int, int, int, int) {
+	r1, c1 := b.MarkR, b.MarkC
+	r2, c2 := b.CursorR, b.CursorC
+	if r1 > r2 || (r1 == r2 && c1 > c2) {
+		r1, c1, r2, c2 = r2, c2, r1, c1
+	}
+	return r1, c1, r2, c2
+}
+
+// RegionText returns the text in the region between mark and point as a slice of runes.
+func (b *Buffer) RegionText() []rune {
+	if !b.MarkActive {
+		return nil
+	}
+	startR, startC, endR, endC := b.regionBounds()
+	var result []rune
+	for r := startR; r <= endR; r++ {
+		line := b.Lines[r]
+		cStart := 0
+		cEnd := len(line)
+		if r == startR {
+			cStart = startC
+		}
+		if r == endR {
+			cEnd = endC
+		}
+		result = append(result, line[cStart:cEnd]...)
+		if r < endR {
+			result = append(result, '\n')
+		}
+	}
+	return result
+}
+
+// KillRegion kills (cuts) the region between mark and point, storing it in the kill ring.
+func (b *Buffer) KillRegion() {
+	if !b.MarkActive {
+		return
+	}
+	text := b.RegionText()
+	if len(text) == 0 {
+		b.MarkActive = false
+		return
+	}
+	b.KillRing = append(b.KillRing, text)
+	b.deleteRegion()
+	b.MarkActive = false
+}
+
+// CopyRegion copies the region to the kill ring without deleting it.
+func (b *Buffer) CopyRegion() {
+	if !b.MarkActive {
+		return
+	}
+	text := b.RegionText()
+	if len(text) > 0 {
+		b.KillRing = append(b.KillRing, text)
+	}
+	b.MarkActive = false
+}
+
+// deleteRegion removes the text between mark and point, placing cursor at the start.
+func (b *Buffer) deleteRegion() {
+	startR, startC, endR, endC := b.regionBounds()
+
+	if startR == endR {
+		// Same line: remove characters between startC and endC
+		line := b.Lines[startR]
+		newLine := make([]rune, startC+len(line)-endC)
+		copy(newLine, line[:startC])
+		copy(newLine[startC:], line[endC:])
+		b.Lines[startR] = newLine
+	} else {
+		// Multi-line: join start of first line with end of last line, remove lines in between
+		startLine := b.Lines[startR][:startC]
+		endLine := b.Lines[endR][endC:]
+		joined := make([]rune, len(startLine)+len(endLine))
+		copy(joined, startLine)
+		copy(joined[len(startLine):], endLine)
+		b.Lines[startR] = joined
+		b.Lines = append(b.Lines[:startR+1], b.Lines[endR+1:]...)
+	}
+
+	b.CursorR = startR
+	b.CursorC = startC
+	b.Modified = true
+}
+
+// InRegion returns true if the given buffer position (row, col) is within the active region.
+func (b *Buffer) InRegion(row, col int) bool {
+	if !b.MarkActive {
+		return false
+	}
+	startR, startC, endR, endC := b.regionBounds()
+	if row < startR || row > endR {
+		return false
+	}
+	if row == startR && col < startC {
+		return false
+	}
+	if row == endR && col >= endC {
+		return false
+	}
+	return true
 }
 
 // DeleteChar deletes the character at the cursor (forward delete). If at the end of a line,

@@ -149,6 +149,9 @@ func main() {
 					switch ev.Rune() {
 					case 'v':
 						buf.ScrollUp(viewHeight)
+					case 'w':
+						buf.CopyRegion()
+						message = "Region copied"
 					case '<':
 						buf.MoveBeginningOfBuffer()
 					case '>':
@@ -164,6 +167,9 @@ func main() {
 					switch kev.Rune() {
 					case 'v':
 						buf.ScrollUp(viewHeight)
+					case 'w':
+						buf.CopyRegion()
+						message = "Region copied"
 					case '<':
 						buf.MoveBeginningOfBuffer()
 					case '>':

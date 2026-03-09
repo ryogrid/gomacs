@@ -590,6 +590,203 @@ func TestYankEmptyKillRing(t *testing.T) {
 	}
 }
 
+// --- Mark and Region Tests ---
+
+func TestSetMark(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "def")
+	b.CursorR = 1
+	b.CursorC = 2
+	b.SetMark()
+	if !b.MarkActive {
+		t.Fatal("mark should be active")
+	}
+	if b.MarkR != 1 || b.MarkC != 2 {
+		t.Fatalf("mark = (%d,%d), want (1,2)", b.MarkR, b.MarkC)
+	}
+}
+
+func TestDeactivateMark(t *testing.T) {
+	b := NewBuffer()
+	b.SetMark()
+	b.DeactivateMark()
+	if b.MarkActive {
+		t.Fatal("mark should be inactive")
+	}
+}
+
+func TestRegionTextSameLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 0
+	b.SetMark()
+	b.CursorC = 5
+	text := b.RegionText()
+	if string(text) != "Hello" {
+		t.Fatalf("region text = %q, want %q", string(text), "Hello")
+	}
+}
+
+func TestRegionTextMultiLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa", "bbb", "ccc")
+	b.CursorR = 0
+	b.CursorC = 1
+	b.SetMark()
+	b.CursorR = 2
+	b.CursorC = 2
+	text := b.RegionText()
+	if string(text) != "aa\nbbb\ncc" {
+		t.Fatalf("region text = %q, want %q", string(text), "aa\nbbb\ncc")
+	}
+}
+
+func TestRegionTextReversed(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 5
+	b.SetMark()
+	b.CursorC = 0 // point before mark
+	text := b.RegionText()
+	if string(text) != "Hello" {
+		t.Fatalf("region text = %q, want %q", string(text), "Hello")
+	}
+}
+
+func TestKillRegionSameLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 0
+	b.SetMark()
+	b.CursorC = 5
+	b.KillRegion()
+
+	got := bufLines(b)
+	want := []string{" World"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if b.CursorC != 0 {
+		t.Fatalf("cursor col = %d, want 0", b.CursorC)
+	}
+	if b.MarkActive {
+		t.Fatal("mark should be deactivated after kill")
+	}
+	if len(b.KillRing) != 1 || string(b.KillRing[0]) != "Hello" {
+		t.Fatalf("kill ring = %v, want [\"Hello\"]", b.KillRing)
+	}
+}
+
+func TestKillRegionMultiLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa", "bbb", "ccc")
+	b.CursorR = 0
+	b.CursorC = 1
+	b.SetMark()
+	b.CursorR = 2
+	b.CursorC = 2
+	b.KillRegion()
+
+	got := bufLines(b)
+	want := []string{"ac"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if b.CursorR != 0 || b.CursorC != 1 {
+		t.Fatalf("cursor = (%d,%d), want (0,1)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestCopyRegion(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 0
+	b.SetMark()
+	b.CursorC = 5
+	b.CopyRegion()
+
+	// Buffer content should be unchanged
+	got := bufLines(b)
+	want := []string{"Hello World"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if b.MarkActive {
+		t.Fatal("mark should be deactivated after copy")
+	}
+	if len(b.KillRing) != 1 || string(b.KillRing[0]) != "Hello" {
+		t.Fatalf("kill ring = %v, want [\"Hello\"]", b.KillRing)
+	}
+}
+
+func TestCopyRegionThenYank(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 0
+	b.SetMark()
+	b.CursorC = 5
+	b.CopyRegion()
+	b.MoveEndOfLine()
+	b.Yank()
+
+	got := bufLines(b)
+	want := []string{"Hello WorldHello"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestInRegion(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa", "bbb", "ccc")
+	b.CursorR = 0
+	b.CursorC = 1
+	b.SetMark()
+	b.CursorR = 2
+	b.CursorC = 2
+
+	// Before region
+	if b.InRegion(0, 0) {
+		t.Fatal("(0,0) should not be in region")
+	}
+	// In region
+	if !b.InRegion(0, 1) {
+		t.Fatal("(0,1) should be in region")
+	}
+	if !b.InRegion(1, 0) {
+		t.Fatal("(1,0) should be in region")
+	}
+	if !b.InRegion(2, 1) {
+		t.Fatal("(2,1) should be in region")
+	}
+	// At/after end
+	if b.InRegion(2, 2) {
+		t.Fatal("(2,2) should not be in region (end is exclusive)")
+	}
+	if b.InRegion(2, 3) {
+		t.Fatal("(2,3) should not be in region")
+	}
+}
+
+func TestInRegionInactive(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	if b.InRegion(0, 0) {
+		t.Fatal("should not be in region when mark is inactive")
+	}
+}
+
+func TestKillRegionInactive(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.KillRegion() // should do nothing
+	got := bufLines(b)
+	want := []string{"abc"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestKillLineEndOfBuffer(t *testing.T) {
 	b := NewBuffer()
 	b.Lines = lines("abc")

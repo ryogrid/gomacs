@@ -19,8 +19,7 @@
 - Message area is on row `height-1`; drawn by `drawMessageLine(screen, msg)` after `drawBuffer`
 - Buffer.Save() writes to temp file then os.Rename for safe writes; clears Modified on success
 - `errNoFilename` is a package-level sentinel error for buffers with no filename
-
----
+- For "repeat to confirm" patterns (like force-quit), use a warning flag that resets on non-related keypresses
 
 ## 2026-03-09 - US-001
 - Project scaffolding: go.mod, tcell dependency, main.go with screen init and C-c exit
@@ -114,5 +113,19 @@
   - Message is cleared on next keypress by resetting the message string
   - `errNoFilename` sentinel used to distinguish "no file" from actual write errors
   - The `redraw` closure captures screen/buf/message/viewHeight to reduce repeated code
+
+---
+
+---
+
+## 2026-03-09 - US-009
+- Quit with C-x C-c: added KeyCtrlC case in C-x prefix handler
+- If buffer is modified, shows warning and sets quitWarned flag; second C-x C-c forces quit
+- Removed standalone C-c quit (quit only via C-x C-c now)
+- quitWarned resets on any keypress that isn't part of C-x sequence
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - "Repeat to confirm" pattern: set a bool flag on first attempt, check it on second attempt, reset on unrelated keys
+  - Reset confirmation flags early in the event loop, before the C-x prefix check, to avoid stale state
 
 ---

@@ -13,6 +13,8 @@
 - For C-k handler, call `redraw(); continue` to skip the general redraw (avoids clearing lastKill flag)
 - Cursor display uses `screen.ShowCursor(buf.CursorC, buf.CursorR - buf.ScrollOffset)` to account for scroll
 - `drawBuffer` renders from `buf.ScrollOffset`, mapping buffer row to screen row via `bufRow = screenRow + ScrollOffset`
+- Mark/Region: `MarkR`, `MarkC`, `MarkActive` on Buffer; `SetMark()`, `DeactivateMark()`, `KillRegion()`, `CopyRegion()`
+- `InRegion(row, col)` for highlight checks; region bounds are ordered via `regionBounds()` helper
 - Alt key bindings use `ev.Modifiers()&tcell.ModAlt != 0` with `ev.Rune()` check; also handle Esc-prefix for terminals
 - Handle both `tcell.KeyBackspace` and `tcell.KeyBackspace2` for cross-terminal compatibility
 - Regular character insertion in KeyRune case goes in the `else` branch after the Alt modifier check
@@ -145,5 +147,20 @@
   - ClearLastKill must be called early in event handling for all non-kill keys
   - Kill ring entries include newline runes ('\n') when killing across lines
   - Yank iterates over runes, calling InsertNewline for '\n' and InsertChar for others
+
+---
+
+## 2026-03-09 - US-011
+- Mark and Region: C-SPC sets mark, C-w kills region, M-w copies region, C-g deactivates mark
+- Region visually highlighted with reverse video in drawBuffer
+- Added Buffer fields: MarkR, MarkC, MarkActive
+- Added methods: SetMark, DeactivateMark, KillRegion, CopyRegion, RegionText, InRegion, deleteRegion, regionBounds
+- Files changed: buffer.go, buffer_test.go, main.go
+- **Learnings for future iterations:**
+  - Region bounds use a helper `regionBounds()` that orders mark/point so start <= end
+  - `InRegion` treats end position as exclusive (matches Emacs behavior)
+  - KillRegion/CopyRegion both deactivate the mark after operation
+  - C-SPC maps to `tcell.KeyCtrlSpace` in tcell
+  - C-g mapped to `tcell.KeyCtrlG` — useful as a general cancel key
 
 ---

@@ -950,6 +950,100 @@ func TestUndoMaxEntries(t *testing.T) {
 	}
 }
 
+// --- Search Tests ---
+
+func TestSearchForwardSimple(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	r, c, ok := b.SearchForward([]rune("World"), 0, 0)
+	if !ok || r != 0 || c != 6 {
+		t.Fatalf("got (%d,%d,%v), want (0,6,true)", r, c, ok)
+	}
+}
+
+func TestSearchForwardFromMiddle(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa bbb aaa")
+	r, c, ok := b.SearchForward([]rune("aaa"), 0, 1)
+	if !ok || r != 0 || c != 8 {
+		t.Fatalf("got (%d,%d,%v), want (0,8,true)", r, c, ok)
+	}
+}
+
+func TestSearchForwardMultiLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("first", "second", "third")
+	r, c, ok := b.SearchForward([]rune("third"), 0, 0)
+	if !ok || r != 2 || c != 0 {
+		t.Fatalf("got (%d,%d,%v), want (2,0,true)", r, c, ok)
+	}
+}
+
+func TestSearchForwardWraps(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "def", "ghi")
+	// Start from line 2, should wrap to find "abc" on line 0
+	r, c, ok := b.SearchForward([]rune("abc"), 2, 1)
+	if !ok || r != 0 || c != 0 {
+		t.Fatalf("got (%d,%d,%v), want (0,0,true)", r, c, ok)
+	}
+}
+
+func TestSearchForwardNotFound(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	_, _, ok := b.SearchForward([]rune("xyz"), 0, 0)
+	if ok {
+		t.Fatal("expected not found")
+	}
+}
+
+func TestSearchForwardEmptyQuery(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello")
+	_, _, ok := b.SearchForward([]rune(""), 0, 0)
+	if ok {
+		t.Fatal("empty query should return not found")
+	}
+}
+
+func TestSearchBackwardSimple(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World Hello")
+	r, c, ok := b.SearchBackward([]rune("Hello"), 0, 17)
+	if !ok || r != 0 || c != 12 {
+		t.Fatalf("got (%d,%d,%v), want (0,12,true)", r, c, ok)
+	}
+}
+
+func TestSearchBackwardMultiLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("first", "second", "third")
+	r, c, ok := b.SearchBackward([]rune("first"), 2, 0)
+	if !ok || r != 0 || c != 0 {
+		t.Fatalf("got (%d,%d,%v), want (0,0,true)", r, c, ok)
+	}
+}
+
+func TestSearchBackwardWraps(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "def", "ghi")
+	// Start from line 0, should wrap to find "ghi" on line 2
+	r, c, ok := b.SearchBackward([]rune("ghi"), 0, 0)
+	if !ok || r != 2 || c != 0 {
+		t.Fatalf("got (%d,%d,%v), want (2,0,true)", r, c, ok)
+	}
+}
+
+func TestSearchBackwardNotFound(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	_, _, ok := b.SearchBackward([]rune("xyz"), 0, 5)
+	if ok {
+		t.Fatal("expected not found")
+	}
+}
+
 func TestKillLineEndOfBuffer(t *testing.T) {
 	b := NewBuffer()
 	b.Lines = lines("abc")

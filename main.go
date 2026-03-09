@@ -77,6 +77,137 @@ func main() {
 			viewHeight = textAreaHeight(screenHeight)
 			message = "" // clear message on next key
 
+			// Handle search mode
+			if searchMode {
+				switch ev.Key() {
+				case tcell.KeyCtrlS:
+					// Search forward for next match
+					searchForward = true
+					if len(searchQuery) > 0 {
+						startR, startC := buf.CursorR, buf.CursorC+1
+						if startC > len(buf.Lines[startR]) {
+							startR++
+							startC = 0
+							if startR >= len(buf.Lines) {
+								startR = 0
+							}
+						}
+						r, c, ok := buf.SearchForward(searchQuery, startR, startC)
+						if ok {
+							buf.CursorR, buf.CursorC = r, c
+							searchMatchR, searchMatchC = r, c
+							searchHasMatch = true
+							message = fmt.Sprintf("I-search: %s", string(searchQuery))
+						} else {
+							message = fmt.Sprintf("Failing I-search: %s", string(searchQuery))
+							searchHasMatch = false
+						}
+					}
+				case tcell.KeyCtrlR:
+					// Search backward for previous match
+					searchForward = false
+					if len(searchQuery) > 0 {
+						startR, startC := buf.CursorR, buf.CursorC
+						r, c, ok := buf.SearchBackward(searchQuery, startR, startC)
+						if ok {
+							buf.CursorR, buf.CursorC = r, c
+							searchMatchR, searchMatchC = r, c
+							searchHasMatch = true
+							message = fmt.Sprintf("I-search backward: %s", string(searchQuery))
+						} else {
+							message = fmt.Sprintf("Failing I-search backward: %s", string(searchQuery))
+							searchHasMatch = false
+						}
+					}
+				case tcell.KeyCtrlG:
+					// Cancel search, restore original position
+					buf.CursorR = searchOrigR
+					buf.CursorC = searchOrigC
+					searchMode = false
+					searchHasMatch = false
+					message = "Quit"
+				case tcell.KeyEnter:
+					// Accept search result, exit search mode
+					searchMode = false
+					searchHasMatch = false
+					message = ""
+				case tcell.KeyBackspace, tcell.KeyBackspace2:
+					// Delete last character from search query
+					if len(searchQuery) > 0 {
+						searchQuery = searchQuery[:len(searchQuery)-1]
+						if len(searchQuery) > 0 {
+							// Re-search from original position
+							var r, c int
+							var ok bool
+							if searchForward {
+								r, c, ok = buf.SearchForward(searchQuery, searchOrigR, searchOrigC)
+							} else {
+								r, c, ok = buf.SearchBackward(searchQuery, searchOrigR, searchOrigC)
+							}
+							if ok {
+								buf.CursorR, buf.CursorC = r, c
+								searchMatchR, searchMatchC = r, c
+								searchHasMatch = true
+							} else {
+								searchHasMatch = false
+							}
+							if searchForward {
+								message = fmt.Sprintf("I-search: %s", string(searchQuery))
+							} else {
+								message = fmt.Sprintf("I-search backward: %s", string(searchQuery))
+							}
+						} else {
+							buf.CursorR = searchOrigR
+							buf.CursorC = searchOrigC
+							searchHasMatch = false
+							if searchForward {
+								message = "I-search: "
+							} else {
+								message = "I-search backward: "
+							}
+						}
+					}
+				case tcell.KeyRune:
+					// Add character to search query
+					searchQuery = append(searchQuery, ev.Rune())
+					var r, c int
+					var ok bool
+					if searchForward {
+						r, c, ok = buf.SearchForward(searchQuery, buf.CursorR, buf.CursorC)
+					} else {
+						r, c, ok = buf.SearchBackward(searchQuery, buf.CursorR, buf.CursorC+1)
+					}
+					if ok {
+						buf.CursorR, buf.CursorC = r, c
+						searchMatchR, searchMatchC = r, c
+						searchHasMatch = true
+						if searchForward {
+							message = fmt.Sprintf("I-search: %s", string(searchQuery))
+						} else {
+							message = fmt.Sprintf("I-search backward: %s", string(searchQuery))
+						}
+					} else {
+						if searchForward {
+							message = fmt.Sprintf("Failing I-search: %s", string(searchQuery))
+						} else {
+							message = fmt.Sprintf("Failing I-search backward: %s", string(searchQuery))
+						}
+						searchHasMatch = false
+					}
+				default:
+					// Any other key exits search mode and is NOT consumed
+					searchMode = false
+					searchHasMatch = false
+					message = ""
+					// Re-post the event so it gets handled normally
+					screen.PostEvent(ev)
+					redraw()
+					continue
+				}
+				redraw()
+				continue
+			}
+
 			// Reset consecutive kill tracking for non-kill keys
 			if ev.Key() != tcell.KeyCtrlK {
 				buf.ClearLastKill()
@@ -131,6 +262,26 @@ func main() {
 				buf.MoveBeginningOfLine()
 			case tcell.KeyCtrlE:
 				buf.MoveEndOfLine()
+			case tcell.KeyCtrlS:
+				searchMode = true
+				searchForward = true
+				searchQuery = nil
+				searchOrigR = buf.CursorR
+				searchOrigC = buf.CursorC
+				searchHasMatch = false
+				message = "I-search: "
+				redraw()
+				continue
+			case tcell.KeyCtrlR:
+				searchMode = true
+				searchForward = false
+				searchQuery = nil
+				searchOrigR = buf.CursorR
+				searchOrigC = buf.CursorC
+				searchHasMatch = false
+				message = "I-search backward: "
+				redraw()
+				continue
 			case tcell.KeyCtrlV:
 				buf.ScrollDown(viewHeight)
 			case tcell.KeyCtrlSpace:

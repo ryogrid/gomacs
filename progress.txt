@@ -11,6 +11,8 @@
 - Cursor display uses `screen.ShowCursor(buf.CursorC, buf.CursorR - buf.ScrollOffset)` to account for scroll
 - `drawBuffer` renders from `buf.ScrollOffset`, mapping buffer row to screen row via `bufRow = screenRow + ScrollOffset`
 - Alt key bindings use `ev.Modifiers()&tcell.ModAlt != 0` with `ev.Rune()` check; also handle Esc-prefix for terminals
+- Handle both `tcell.KeyBackspace` and `tcell.KeyBackspace2` for cross-terminal compatibility
+- Regular character insertion in KeyRune case goes in the `else` branch after the Alt modifier check
 
 ---
 
@@ -50,6 +52,18 @@
   - `screen.ShowCursor(col, row)` must be called after every redraw to position the hardware cursor
   - Cursor movement methods live on Buffer since they depend on buffer state (line lengths, bounds)
   - When moving up/down, cursor column must be clamped to the target line's length
+
+---
+
+## 2026-03-09 - US-006
+- Wired text insertion and editing keys into the event loop
+- Printable characters insert via InsertChar, Enter via InsertNewline, Backspace via Backspace, C-d via DeleteChar
+- All buffer methods already existed from US-002; only main.go event loop needed changes
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Buffer editing methods were pre-built in US-002, so wiring up editing keys is just adding cases to the event loop switch
+  - KeyBackspace and KeyBackspace2 both need to be handled (different terminals send different codes)
+  - Regular character insertion goes in the `else` branch of the Alt modifier check in the KeyRune case
 
 ---
 

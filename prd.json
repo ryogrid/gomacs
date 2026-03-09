@@ -106,7 +106,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Use buffer methods from US-002. Mark buffer as modified on any edit."
     },
     {

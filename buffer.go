@@ -15,6 +15,8 @@ type Buffer struct {
 	ScrollOffset int // top visible line
 	Modified     bool
 	Filename     string
+	KillRing     [][]rune // kill ring entries (each entry is a sequence of runes, newlines included)
+	lastKill     bool     // true if the last operation was a kill (for appending consecutive kills)
 }
 
 // NewBuffer creates a new empty buffer with one empty line.
@@ -256,6 +258,69 @@ func (b *Buffer) Save() error {
 }
 
 var errNoFilename = fmt.Errorf("no filename")
+
+// KillLine kills text from cursor to end of line (C-k). If cursor is at end of line,
+// kills the newline (joins with next line). Consecutive kills append to the kill ring entry.
+func (b *Buffer) KillLine() {
+	line := b.Lines[b.CursorR]
+	if b.CursorC < len(line) {
+		// Kill from cursor to end of line
+		killed := make([]rune, len(line)-b.CursorC)
+		copy(killed, line[b.CursorC:])
+		b.Lines[b.CursorR] = line[:b.CursorC]
+		b.appendKill(killed)
+	} else if b.CursorR < len(b.Lines)-1 {
+		// At end of line: kill the newline (join with next line)
+		b.appendKill([]rune{'\n'})
+		nextLine := b.Lines[b.CursorR+1]
+		joined := make([]rune, len(line)+len(nextLine))
+		copy(joined, line)
+		copy(joined[len(line):], nextLine)
+		b.Lines[b.CursorR] = joined
+		b.Lines = append(b.Lines[:b.CursorR+1], b.Lines[b.CursorR+2:]...)
+	} else {
+		// At end of last line: nothing to kill, but mark as kill for consecutive tracking
+		b.lastKill = true
+		return
+	}
+	b.Modified = true
+	b.lastKill = true
+}
+
+// appendKill adds killed text to the kill ring. If the last operation was also a kill,
+// it appends to the current kill ring entry instead of creating a new one.
+func (b *Buffer) appendKill(text []rune) {
+	if b.lastKill && len(b.KillRing) > 0 {
+		// Append to existing entry
+		last := b.KillRing[len(b.KillRing)-1]
+		combined := make([]rune, len(last)+len(text))
+		copy(combined, last)
+		copy(combined[len(last):], text)
+		b.KillRing[len(b.KillRing)-1] = combined
+	} else {
+		b.KillRing = append(b.KillRing, text)
+	}
+}
+
+// ClearLastKill resets the consecutive kill tracking. Call this on any non-kill operation.
+func (b *Buffer) ClearLastKill() {
+	b.lastKill = false
+}
+
+// Yank inserts the last killed text at the cursor position.
+func (b *Buffer) Yank() {
+	if len(b.KillRing) == 0 {
+		return
+	}
+	text := b.KillRing[len(b.KillRing)-1]
+	for _, ch := range text {
+		if ch == '\n' {
+			b.InsertNewline()
+		} else {
+			b.InsertChar(ch)
+		}
+	}
+}
 
 // DeleteChar deletes the character at the cursor (forward delete). If at the end of a line,
 // it joins the next line to the current one. This will be used by C-d in US-006.

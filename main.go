@@ -60,6 +60,11 @@ func main() {
 			viewHeight = textAreaHeight(screenHeight)
 			message = "" // clear message on next key
 
+			// Reset consecutive kill tracking for non-kill keys
+			if ev.Key() != tcell.KeyCtrlK {
+				buf.ClearLastKill()
+			}
+
 			// Reset quit warning unless we're in a C-x prefix sequence
 			if ev.Key() != tcell.KeyCtrlX && !prefixCx {
 				quitWarned = false
@@ -111,6 +116,12 @@ func main() {
 				buf.MoveEndOfLine()
 			case tcell.KeyCtrlV:
 				buf.ScrollDown(viewHeight)
+			case tcell.KeyCtrlK:
+				buf.KillLine()
+				redraw()
+				continue
+			case tcell.KeyCtrlY:
+				buf.Yank()
 			case tcell.KeyCtrlD:
 				buf.DeleteChar()
 			case tcell.KeyEnter:

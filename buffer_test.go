@@ -453,3 +453,156 @@ func TestDeleteCharEndOfBuffer(t *testing.T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+// --- Kill and Yank Tests ---
+
+func TestKillLineMiddle(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 5
+
+	b.KillLine()
+
+	got := bufLines(b)
+	want := []string{"Hello"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if len(b.KillRing) != 1 || string(b.KillRing[0]) != " World" {
+		t.Fatalf("kill ring = %v, want [\" World\"]", b.KillRing)
+	}
+}
+
+func TestKillLineAtEnd(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello", "World")
+	b.CursorC = 5 // end of "Hello"
+
+	b.KillLine()
+
+	got := bufLines(b)
+	want := []string{"HelloWorld"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if len(b.KillRing) != 1 || string(b.KillRing[0]) != "\n" {
+		t.Fatalf("kill ring = %v, want [\"\\n\"]", b.KillRing)
+	}
+}
+
+func TestKillLineEmptyLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("", "World")
+	b.CursorC = 0
+
+	b.KillLine()
+
+	got := bufLines(b)
+	want := []string{"World"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestConsecutiveKillsAppend(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa", "bbb", "ccc")
+	b.CursorC = 0
+
+	b.KillLine() // kills "aaa"
+	b.KillLine() // kills newline (joins with bbb)
+	b.KillLine() // kills "bbb"
+
+	if len(b.KillRing) != 1 {
+		t.Fatalf("expected 1 kill ring entry, got %d", len(b.KillRing))
+	}
+	if string(b.KillRing[0]) != "aaa\nbbb" {
+		t.Fatalf("kill ring = %q, want %q", string(b.KillRing[0]), "aaa\nbbb")
+	}
+}
+
+func TestNonConsecutiveKillsNewEntry(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa", "bbb")
+	b.CursorC = 0
+
+	b.KillLine()      // kills "aaa"
+	b.ClearLastKill() // simulate non-kill key
+	b.KillLine()      // kills newline — new entry
+
+	if len(b.KillRing) != 2 {
+		t.Fatalf("expected 2 kill ring entries, got %d", len(b.KillRing))
+	}
+}
+
+func TestYankSimple(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("Hello World")
+	b.CursorC = 5
+
+	b.KillLine() // kills " World"
+
+	// Move to beginning and yank
+	b.CursorC = 0
+	b.ClearLastKill()
+	b.Yank()
+
+	got := bufLines(b)
+	want := []string{" WorldHello"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestYankMultiLine(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("aaa", "bbb", "ccc")
+	b.CursorC = 0
+
+	b.KillLine() // kills "aaa"
+	b.KillLine() // kills newline
+	b.KillLine() // kills "bbb"
+
+	// Now at line "ccc", yank the killed text
+	b.ClearLastKill()
+	b.CursorC = 0
+	b.Yank()
+
+	got := bufLines(b)
+	// After kills: buffer is ["", "ccc"]. Yank "aaa\nbbb" at (0,0) → "aaa", "bbb", "ccc"
+	want := []string{"aaa", "bbb", "ccc"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestYankEmptyKillRing(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 0
+
+	b.Yank() // should do nothing
+
+	got := bufLines(b)
+	want := []string{"abc"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestKillLineEndOfBuffer(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc")
+	b.CursorC = 3
+
+	b.KillLine() // at end of last line, nothing to kill
+
+	got := bufLines(b)
+	want := []string{"abc"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	if len(b.KillRing) != 0 {
+		t.Fatalf("kill ring should be empty, got %v", b.KillRing)
+	}
+}

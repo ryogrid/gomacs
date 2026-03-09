@@ -61,6 +61,12 @@ func main() {
 				buf.MoveEndOfLine()
 			case tcell.KeyCtrlV:
 				buf.ScrollDown(viewHeight)
+			case tcell.KeyCtrlD:
+				buf.DeleteChar()
+			case tcell.KeyEnter:
+				buf.InsertNewline()
+			case tcell.KeyBackspace, tcell.KeyBackspace2:
+				buf.Backspace()
 			case tcell.KeyRight:
 				buf.MoveForward()
 			case tcell.KeyLeft:
@@ -79,6 +85,8 @@ func main() {
 					case '>':
 						buf.MoveEndOfBuffer()
 					}
+				} else {
+					buf.InsertChar(ev.Rune())
 				}
 			case tcell.KeyEsc:
 				// Handle Esc-prefixed sequences (for terminals that send Esc then key)

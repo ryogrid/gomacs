@@ -337,6 +337,109 @@ func TestMoveEndOfLine(t *testing.T) {
 	}
 }
 
+// --- Scroll and Viewport Tests ---
+
+func TestAdjustScrollDown(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+	b.CursorR = 5
+	b.AdjustScroll(3) // viewport shows 3 lines
+	if b.ScrollOffset != 3 {
+		t.Fatalf("ScrollOffset = %d, want 3", b.ScrollOffset)
+	}
+}
+
+func TestAdjustScrollUp(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2", "3", "4")
+	b.ScrollOffset = 3
+	b.CursorR = 1
+	b.AdjustScroll(3)
+	if b.ScrollOffset != 1 {
+		t.Fatalf("ScrollOffset = %d, want 1", b.ScrollOffset)
+	}
+}
+
+func TestAdjustScrollNoChange(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2", "3", "4")
+	b.ScrollOffset = 1
+	b.CursorR = 2
+	b.AdjustScroll(5)
+	if b.ScrollOffset != 1 {
+		t.Fatalf("ScrollOffset = %d, want 1", b.ScrollOffset)
+	}
+}
+
+func TestScrollDown(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+	b.CursorR = 0
+	b.ScrollDown(5)
+	if b.ScrollOffset != 5 {
+		t.Fatalf("ScrollOffset = %d, want 5", b.ScrollOffset)
+	}
+	if b.CursorR != 5 {
+		t.Fatalf("CursorR = %d, want 5", b.CursorR)
+	}
+}
+
+func TestScrollDownClamps(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2")
+	b.ScrollDown(10)
+	if b.ScrollOffset != 2 {
+		t.Fatalf("ScrollOffset = %d, want 2", b.ScrollOffset)
+	}
+}
+
+func TestScrollUp(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+	b.ScrollOffset = 5
+	b.CursorR = 8
+	b.ScrollUp(5)
+	if b.ScrollOffset != 0 {
+		t.Fatalf("ScrollOffset = %d, want 0", b.ScrollOffset)
+	}
+	if b.CursorR != 4 {
+		t.Fatalf("CursorR = %d, want 4", b.CursorR)
+	}
+}
+
+func TestScrollUpClamps(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("0", "1", "2")
+	b.ScrollOffset = 1
+	b.CursorR = 2
+	b.ScrollUp(10)
+	if b.ScrollOffset != 0 {
+		t.Fatalf("ScrollOffset = %d, want 0", b.ScrollOffset)
+	}
+}
+
+func TestMoveBeginningOfBuffer(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "def", "ghi")
+	b.CursorR = 2
+	b.CursorC = 3
+	b.MoveBeginningOfBuffer()
+	if b.CursorR != 0 || b.CursorC != 0 {
+		t.Fatalf("cursor = (%d,%d), want (0,0)", b.CursorR, b.CursorC)
+	}
+}
+
+func TestMoveEndOfBuffer(t *testing.T) {
+	b := NewBuffer()
+	b.Lines = lines("abc", "def", "ghi")
+	b.CursorR = 0
+	b.CursorC = 0
+	b.MoveEndOfBuffer()
+	if b.CursorR != 2 || b.CursorC != 3 {
+		t.Fatalf("cursor = (%d,%d), want (2,3)", b.CursorR, b.CursorC)
+	}
+}
+
 func TestDeleteCharEndOfBuffer(t *testing.T) {
 	b := NewBuffer()
 	b.Lines = lines("abc")

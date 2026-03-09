@@ -7,11 +7,12 @@ import (
 
 // Buffer holds the text content as a slice of lines, where each line is a slice of runes.
 type Buffer struct {
-	Lines    [][]rune
-	CursorR  int // cursor row
-	CursorC  int // cursor column
-	Modified bool
-	Filename string
+	Lines        [][]rune
+	CursorR      int // cursor row
+	CursorC      int // cursor column
+	ScrollOffset int // top visible line
+	Modified     bool
+	Filename     string
 }
 
 // NewBuffer creates a new empty buffer with one empty line.
@@ -156,6 +157,63 @@ func (b *Buffer) MoveBeginningOfLine() {
 // MoveEndOfLine moves the cursor to the end of the current line.
 func (b *Buffer) MoveEndOfLine() {
 	b.CursorC = len(b.Lines[b.CursorR])
+}
+
+// ScrollDown scrolls the view down by one page.
+func (b *Buffer) ScrollDown(viewHeight int) {
+	b.ScrollOffset += viewHeight
+	maxOffset := len(b.Lines) - 1
+	if b.ScrollOffset > maxOffset {
+		b.ScrollOffset = maxOffset
+	}
+	// Move cursor to top of new view if it's above the viewport
+	if b.CursorR < b.ScrollOffset {
+		b.CursorR = b.ScrollOffset
+		if b.CursorC > len(b.Lines[b.CursorR]) {
+			b.CursorC = len(b.Lines[b.CursorR])
+		}
+	}
+}
+
+// ScrollUp scrolls the view up by one page.
+func (b *Buffer) ScrollUp(viewHeight int) {
+	b.ScrollOffset -= viewHeight
+	if b.ScrollOffset < 0 {
+		b.ScrollOffset = 0
+	}
+	// Move cursor to bottom of new view if it's below the viewport
+	lastVisible := b.ScrollOffset + viewHeight - 1
+	if lastVisible >= len(b.Lines) {
+		lastVisible = len(b.Lines) - 1
+	}
+	if b.CursorR > lastVisible {
+		b.CursorR = lastVisible
+		if b.CursorC > len(b.Lines[b.CursorR]) {
+			b.CursorC = len(b.Lines[b.CursorR])
+		}
+	}
+}
+
+// MoveBeginningOfBuffer moves cursor to the beginning of the buffer.
+func (b *Buffer) MoveBeginningOfBuffer() {
+	b.CursorR = 0
+	b.CursorC = 0
+}
+
+// MoveEndOfBuffer moves cursor to the end of the buffer.
+func (b *Buffer) MoveEndOfBuffer() {
+	b.CursorR = len(b.Lines) - 1
+	b.CursorC = len(b.Lines[b.CursorR])
+}
+
+// AdjustScroll ensures the cursor is visible within the viewport of the given height.
+func (b *Buffer) AdjustScroll(viewHeight int) {
+	if b.CursorR < b.ScrollOffset {
+		b.ScrollOffset = b.CursorR
+	}
+	if b.CursorR >= b.ScrollOffset+viewHeight {
+		b.ScrollOffset = b.CursorR - viewHeight + 1
+	}
 }
 
 // DeleteChar deletes the character at the cursor (forward delete). If at the end of a line,

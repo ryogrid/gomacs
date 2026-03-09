@@ -8,6 +8,9 @@
 - Long lines truncated at screen width, lines beyond screen height not rendered
 - Use `os.ReadFile` + `strings.Split` for file loading, trim trailing newline first
 - Buffer tracks `ScrollOffset` (top visible line); use `AdjustScroll(viewHeight)` after cursor changes
+- Kill ring is `[][]rune` on Buffer; `lastKill` bool tracks consecutive kills for appending
+- Use `ClearLastKill()` before non-kill operations to break consecutive kill appending
+- For C-k handler, call `redraw(); continue` to skip the general redraw (avoids clearing lastKill flag)
 - Cursor display uses `screen.ShowCursor(buf.CursorC, buf.CursorR - buf.ScrollOffset)` to account for scroll
 - `drawBuffer` renders from `buf.ScrollOffset`, mapping buffer row to screen row via `bufRow = screenRow + ScrollOffset`
 - Alt key bindings use `ev.Modifiers()&tcell.ModAlt != 0` with `ev.Rune()` check; also handle Esc-prefix for terminals
@@ -127,5 +130,20 @@
 - **Learnings for future iterations:**
   - "Repeat to confirm" pattern: set a bool flag on first attempt, check it on second attempt, reset on unrelated keys
   - Reset confirmation flags early in the event loop, before the C-x prefix check, to avoid stale state
+
+---
+
+## 2026-03-09 - US-010
+- Kill and Yank: C-k kills from cursor to end of line, C-y yanks last killed text
+- Kill ring stored as `[][]rune` on Buffer; consecutive C-k appends to same entry
+- C-k on empty line kills the newline (joins with next line)
+- Yank handles multi-line content by inserting newlines via InsertNewline
+- Added `lastKill` bool for consecutive kill tracking; `ClearLastKill()` resets it
+- Files changed: buffer.go, buffer_test.go, main.go
+- **Learnings for future iterations:**
+  - C-k handler uses `redraw(); continue` to skip the general ClearLastKill logic at the bottom of the event loop
+  - ClearLastKill must be called early in event handling for all non-kill keys
+  - Kill ring entries include newline runes ('\n') when killing across lines
+  - Yank iterates over runes, calling InsertNewline for '\n' and InsertChar for others
 
 ---

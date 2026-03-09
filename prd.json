@@ -170,7 +170,7 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Implement a simple kill ring (can be a single string or slice of strings)."
     },
     {

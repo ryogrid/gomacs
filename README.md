@@ -11,7 +11,7 @@ Gomacs provides a familiar Emacs keybinding experience for quick file editing wi
 - **Mark and region** -- Set mark, select regions, kill/copy/yank (C-SPC, C-w, M-w, C-y)
 - **Kill ring** -- Consecutive kills accumulate; yank pastes the last kill
 - **Undo** -- Up to 100 levels of undo history (C-_ / C-/)
-- **Cross-platform terminal support** -- Built on [tcell](https://github.com/gdamore/tcell), works on Linux, macOS, Windows Terminal, and WSL2
+- **Cross-platform terminal support** -- Pure Go implementation with no external dependencies, works on Linux, macOS, Windows Terminal, and WSL2
 
 ## Installation
 
@@ -79,13 +79,12 @@ gomacs/
 ├── main.go          # Event loop and terminal UI rendering
 ├── buffer.go        # Buffer data structure and editing operations
 ├── buffer_test.go   # Unit tests
-├── go.mod           # Go module definition
-└── go.sum           # Dependency checksums
+└── go.mod           # Go module definition
 ```
 
 ## Dependencies
 
-- [tcell v2](https://github.com/gdamore/tcell) -- Cross-platform terminal handling library
+No external dependencies. Gomacs uses only the Go standard library for terminal handling via ANSI escape sequences. Previously the project depended on [tcell](https://github.com/gdamore/tcell), but this has been replaced with a pure Go implementation.
 
 ## Testing
 

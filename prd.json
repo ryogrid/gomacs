@@ -89,7 +89,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Draw separators in the redraw function after drawing all window contents. The separator column for window i is at windows[i].StartCol + windows[i].Width (the column immediately after the window). Cursor: in ShowCursor call, add activeWin.StartCol to the column offset."
     },
     {

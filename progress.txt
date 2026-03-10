@@ -16,6 +16,19 @@
 
 ## Progress: Horizontal Window Split
 
+## 2026-03-10 - US-005
+- What was implemented: Vertical separators between horizontal windows and correct cursor positioning
+- Added separator drawing in redraw(): iterates windows 0..n-2, draws '│' (U+2502) at sepCol = win.StartCol + win.Width for each row 0..screenHeight-2
+- Separators only drawn when splitMode == "horizontal" && len(windows) > 1
+- Fixed cursor positioning: added activeWin.StartCol offset to ShowCursor x coordinate
+- In vertical mode, no separators drawn and StartCol=0, so existing behavior preserved
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Separator column for window i is at windows[i].StartCol + windows[i].Width (the gap before next window)
+  - Separators span rows 0 to screenHeight-2 (excluding the message line row)
+  - Cursor x = activeWin.StartCol + bufColToVisualCol(...)
+---
+
 ## 2026-03-10 - US-004
 - What was implemented: Updated drawWindowContent and drawWindowStatusLine to respect window's StartCol and Width
 - drawWindowContent: uses win.Width instead of screen width for boundary checks, adds win.StartCol offset to all SetContent calls

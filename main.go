@@ -581,17 +581,51 @@ func main() {
 						}
 						message = minibufferPrompt
 					case '2':
-					// Split current window into two
-					newWin := &Window{
-						Buffer:       activeWin.Buffer,
-						ScrollOffset: activeWin.ScrollOffset,
+					// Split current window vertically (top/bottom)
+					if splitMode == "horizontal" && len(windows) > 1 {
+						message = "Cannot split vertically while in horizontal split mode"
+					} else {
+						newWin := &Window{
+							Buffer:       activeWin.Buffer,
+							ScrollOffset: activeWin.ScrollOffset,
+						}
+						if len(windows) == 1 {
+							splitMode = "vertical"
+						}
+						// Insert new window after the active one
+						idx := activeWindowIdx + 1
+						windows = append(windows, nil)
+						copy(windows[idx+1:], windows[idx:])
+						windows[idx] = newWin
+						recalcWindows(windows, screenWidth, screenHeight)
 					}
-					// Insert new window after the active one
-					idx := activeWindowIdx + 1
-					windows = append(windows, nil)
-					copy(windows[idx+1:], windows[idx:])
-					windows[idx] = newWin
-					recalcWindows(windows, screenWidth, screenHeight)
+				case '3':
+					// Split current window horizontally (side-by-side)
+					if splitMode == "vertical" && len(windows) > 1 {
+						message = "Cannot split horizontally while in vertical split mode"
+					} else {
+						// Check minimum width: each window needs at least 10 columns,
+						// plus 1 separator column between each pair of windows.
+						newCount := len(windows) + 1
+						availableWidth := screenWidth - (newCount - 1) // subtract separator columns
+						if availableWidth/newCount < 10 {
+							message = "Window too narrow to split"
+						} else {
+							newWin := &Window{
+								Buffer:       activeWin.Buffer,
+								ScrollOffset: activeWin.ScrollOffset,
+							}
+							if len(windows) == 1 {
+								splitMode = "horizontal"
+							}
+							// Insert new window after the active one
+							idx := activeWindowIdx + 1
+							windows = append(windows, nil)
+							copy(windows[idx+1:], windows[idx:])
+							windows[idx] = newWin
+							recalcWindows(windows, screenWidth, screenHeight)
+						}
+					}
 				case 'o':
 					// Move focus to next window (cycle)
 					if len(windows) > 1 {

@@ -926,8 +926,9 @@ type searchHighlight struct {
 }
 
 // drawWindowContent renders a window's buffer content within its row range.
+// Content is drawn starting at win.StartCol and constrained to win.Width columns.
 func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
-	width, _ := screen.Size()
+	winWidth := win.Width
 	viewH := win.ViewHeight()
 	buf := win.Buffer
 
@@ -945,7 +946,7 @@ func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
 		}
 		line := buf.Lines[bufRow]
 		visualCol := 0
-		for bufCol := 0; bufCol < len(line) && visualCol < width; bufCol++ {
+		for bufCol := 0; bufCol < len(line) && visualCol < winWidth; bufCol++ {
 			style := term.StyleDefault
 			if buf.Highlight != nil {
 				style = buf.Highlight.StyleAt(bufRow, bufCol)
@@ -958,12 +959,12 @@ func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
 			}
 			if line[bufCol] == '\t' {
 				nextStop := visualCol + tabWidth - (visualCol%tabWidth)
-				for visualCol < nextStop && visualCol < width {
-					screen.SetContent(visualCol, screenRow, ' ', style)
+				for visualCol < nextStop && visualCol < winWidth {
+					screen.SetContent(win.StartCol+visualCol, screenRow, ' ', style)
 					visualCol++
 				}
 			} else {
-				screen.SetContent(visualCol, screenRow, line[bufCol], style)
+				screen.SetContent(win.StartCol+visualCol, screenRow, line[bufCol], style)
 				visualCol++
 			}
 		}
@@ -987,8 +988,9 @@ func drawMessageLine(screen term.Screen, msg string) {
 
 // drawWindowStatusLine renders a window's status line.
 // Active windows use reverse video; inactive windows use dashes with default style.
+// The status line is constrained to the window's column range (StartCol to StartCol+Width).
 func drawWindowStatusLine(screen term.Screen, win *Window, active bool) {
-	width, _ := screen.Size()
+	winWidth := win.Width
 	statusRow := win.StartRow + win.Height - 1
 
 	buf := win.Buffer
@@ -1011,27 +1013,27 @@ func drawWindowStatusLine(screen term.Screen, win *Window, active bool) {
 		fillChar = '-'
 	}
 
-	// Fill entire status line
-	for col := 0; col < width; col++ {
-		screen.SetContent(col, statusRow, fillChar, style)
+	// Fill entire status line within window's column range
+	for col := 0; col < winWidth; col++ {
+		screen.SetContent(win.StartCol+col, statusRow, fillChar, style)
 	}
 	// Draw left-aligned text
 	for i, ch := range []rune(left) {
-		if i >= width {
+		if i >= winWidth {
 			break
 		}
-		screen.SetContent(i, statusRow, ch, style)
+		screen.SetContent(win.StartCol+i, statusRow, ch, style)
 	}
 	// Draw right-aligned text
-	startCol := width - len([]rune(right))
+	startCol := winWidth - len([]rune(right))
 	if startCol < len([]rune(left)) {
 		startCol = len([]rune(left))
 	}
 	for i, ch := range []rune(right) {
 		col := startCol + i
-		if col >= width {
+		if col >= winWidth {
 			break
 		}
-		screen.SetContent(col, statusRow, ch, style)
+		screen.SetContent(win.StartCol+col, statusRow, ch, style)
 	}
 }

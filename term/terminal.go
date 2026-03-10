@@ -3,6 +3,7 @@ package term
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"syscall"
 	"unsafe"
 )
@@ -20,14 +21,26 @@ type termios struct {
 }
 
 const (
-	tcgets = 0x5401 // TCGETS ioctl number on Linux
-	tcsets = 0x5402 // TCSETS ioctl number on Linux
+	tcgets     = 0x5401 // TCGETS ioctl number on Linux
+	tcsets     = 0x5402 // TCSETS ioctl number on Linux
+	tiocgwinsz = 0x5413 // TIOCGWINSZ ioctl number on Linux
 )
+
+// winsize mirrors the C struct winsize used by TIOCGWINSZ.
+type winsize struct {
+	Row uint16
+	Col uint16
+	X   uint16
+	Y   uint16
+}
 
 // Terminal is a pure Go terminal backend implementing the Screen interface.
 type Terminal struct {
 	origTermios *termios
 	fd          int
+	events      chan Event
+	sigwinch    chan os.Signal
+	stopSig     chan struct{}
 }
 
 // NewTerminal creates a new Terminal instance.
@@ -68,11 +81,24 @@ func (t *Terminal) Init() error {
 	os.Stdout.WriteString("\033[?1049h") // enter alternate screen
 	os.Stdout.WriteString("\033[?25l")   // hide cursor
 
+	// Set up event channel and SIGWINCH handler.
+	t.events = make(chan Event, 64)
+	t.sigwinch = make(chan os.Signal, 1)
+	t.stopSig = make(chan struct{})
+	signal.Notify(t.sigwinch, syscall.SIGWINCH)
+	go t.handleSigwinch()
+
 	return nil
 }
 
 // Fini restores the terminal to its original state.
 func (t *Terminal) Fini() {
+	// Stop SIGWINCH handler.
+	if t.stopSig != nil {
+		close(t.stopSig)
+		signal.Stop(t.sigwinch)
+	}
+
 	// Exit alternate screen buffer and show cursor.
 	os.Stdout.WriteString("\033[?25h")   // show cursor
 	os.Stdout.WriteString("\033[?1049l") // exit alternate screen
@@ -112,9 +138,41 @@ func (t *Terminal) setTermios(tio *termios) error {
 	return nil
 }
 
+// handleSigwinch listens for SIGWINCH signals and posts ResizeEvents.
+func (t *Terminal) handleSigwinch() {
+	for {
+		select {
+		case <-t.stopSig:
+			return
+		case <-t.sigwinch:
+			w, h := t.Size()
+			ev := NewResizeEvent(w, h)
+			select {
+			case t.events <- ev:
+			default:
+				// Drop resize event if channel is full.
+			}
+		}
+	}
+}
+
+// Size returns the current terminal dimensions (columns, rows) using TIOCGWINSZ.
+func (t *Terminal) Size() (int, int) {
+	var ws winsize
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		uintptr(t.fd),
+		uintptr(tiocgwinsz),
+		uintptr(unsafe.Pointer(&ws)),
+	)
+	if errno != 0 || ws.Col == 0 || ws.Row == 0 {
+		return 80, 24 // fallback
+	}
+	return int(ws.Col), int(ws.Row)
+}
+
 // Stub methods to satisfy the Screen interface.
 
-func (t *Terminal) Size() (int, int)               { return 80, 24 }
 func (t *Terminal) PollEvent() Event               { return nil }
 func (t *Terminal) PostEvent(ev Event)              {}
 func (t *Terminal) Clear()                          {}

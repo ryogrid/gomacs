@@ -216,9 +216,18 @@ func main() {
 			}
 			drawWindowStatusLine(screen, win, isActive)
 		}
+		// Draw vertical separators between horizontal windows.
+		if splitMode == "horizontal" && len(windows) > 1 {
+			for i := 0; i < len(windows)-1; i++ {
+				sepCol := windows[i].StartCol + windows[i].Width
+				for row := 0; row < screenHeight-1; row++ {
+					screen.SetContent(sepCol, row, '│', term.StyleDefault)
+				}
+			}
+		}
 		drawMessageLine(screen, message)
 		screen.ShowCursor(
-			bufColToVisualCol(activeWin.Buffer.Lines[activeWin.Buffer.CursorR], activeWin.Buffer.CursorC),
+			activeWin.StartCol+bufColToVisualCol(activeWin.Buffer.Lines[activeWin.Buffer.CursorR], activeWin.Buffer.CursorC),
 			activeWin.Buffer.CursorR-activeWin.ScrollOffset+activeWin.StartRow,
 		)
 		screen.Show()

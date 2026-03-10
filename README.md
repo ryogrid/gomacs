@@ -13,7 +13,8 @@ Gomacs provides a familiar Emacs keybinding experience for quick file editing wi
 - **Mark and region** -- Set mark, select regions, kill/copy/yank (C-SPC, C-w, M-w, C-y)
 - **Kill ring** -- Consecutive kills accumulate; yank pastes the last kill
 - **Undo** -- Up to 100 levels of undo history (C-_ / C-/)
-- **Cross-platform terminal support** -- Pure Go implementation with no external dependencies, works on Linux, macOS, Windows Terminal, and WSL2
+- **Tab support** -- Displays tabs with 8-column tab stops
+- **Zero dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences, no external libraries
 
 ## Installation
 
@@ -74,19 +75,36 @@ go build -o gomacs .
 | C-x C-s | Save file |
 | C-x C-c | Quit (warns on unsaved changes) |
 
+## Status Bar
+
+The status bar at the bottom of the screen shows:
+- Filename (or `[No Name]` for unsaved buffers)
+- `[Modified]` indicator when the buffer has unsaved changes
+- Current line / total lines and column number (e.g., `Line 42/100, Col 15`)
+
 ## Project Structure
 
 ```
 gomacs/
-├── main.go          # Event loop and terminal UI rendering
-├── buffer.go        # Buffer data structure and editing operations
-├── buffer_test.go   # Unit tests
-└── go.mod           # Go module definition
+├── main.go              # Event loop, keybinding dispatch, and UI rendering
+├── buffer.go            # Buffer data structure and editing operations
+├── buffer_test.go       # Buffer unit tests (69 tests)
+├── main_test.go         # Main package tests
+├── go.mod               # Go module definition (zero dependencies)
+├── term/                # Pure Go terminal backend
+│   ├── screen.go        # Screen interface, Event types, Style, KeyCode constants
+│   ├── terminal.go      # Terminal implementation (raw mode, ANSI rendering, input parsing)
+│   └── terminal_test.go # Terminal backend tests (16 tests)
+└── impl_docs/           # Implementation documentation
+    ├── architecture.md  # Architecture overview with diagrams
+    ├── buffer.md        # Buffer data structure documentation
+    ├── terminal.md      # Terminal backend documentation
+    └── event-loop.md    # Event loop and rendering documentation
 ```
 
 ## Dependencies
 
-No external dependencies. Gomacs uses only the Go standard library for terminal handling via ANSI escape sequences. Previously the project depended on [tcell](https://github.com/gdamore/tcell), but this has been replaced with a pure Go implementation.
+No external dependencies. Gomacs uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) for terminal handling via ANSI/VT100 escape sequences.
 
 ## Testing
 

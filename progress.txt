@@ -11,6 +11,7 @@
 - Tab expansion handled in rendering (bufColToVisualCol)
 - Minibuffer input mode: set `minibufferMode=true`, `minibufferPrompt`, `minibufferCallback` to activate; callback receives input string on Enter
 - C-x prefix plain-char keys: use `case term.KeyRune:` with nested `switch ev.Rune()` for b, k, 0, 1, 2, o
+- Confirm mode (y/n prompts): set `confirmMode=true`, `confirmCallback=func(bool){...}`, set `message` to prompt; handled before kill tracking reset in dispatch order
 - After switching `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]` and update `previousBufferIdx`
 
 ## Progress: Multi-Buffer & Window Splitting
@@ -72,4 +73,17 @@
   - C-x C-b uses `term.KeyCtrlB` in the C-x prefix handler (ctrl combos, not rune)
   - Special buffers like *Buffer List* should have Modified=false set after content update to avoid save prompts
   - The Edit tool in Claude Code struggles with tab-indented Go files — using a Python patch script is more reliable for inserting large blocks
+---
+
+## 2026-03-10 - US-006
+- Added C-x k handler in C-x prefix rune dispatch (case 'k')
+- Minibuffer prompt shows default buffer name; callback finds target buffer by name or uses current
+- Added confirm mode (confirmMode bool, confirmCallback func(bool)) for y/n prompts when buffer is modified
+- Confirm mode dispatch: 'y' calls callback(true), 'n' cancels, C-g cancels — inserted after minibuffer dispatch, before kill tracking reset
+- Kill logic: removes buffer from slice, adjusts activeBufferIdx and previousBufferIdx, creates *scratch* if last buffer killed
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Confirm mode is a new sub-mode at priority: searchMode → minibufferMode → confirmMode → C-x prefix → normal
+  - When removing an element from `buffers` slice by index, must adjust both `activeBufferIdx` and `previousBufferIdx` (decrement if they were after the removed index, clamp if at end)
+  - The `killBuffer` closure inside the minibuffer callback captures `targetIdx` — this works because the confirm callback runs synchronously within the same event loop iteration
 ---

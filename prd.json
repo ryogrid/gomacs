@@ -105,7 +105,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "The y/n confirmation is a sub-mode within the minibuffer flow. After the minibuffer callback identifies the target buffer, check its Modified flag before removing."
     },
     {

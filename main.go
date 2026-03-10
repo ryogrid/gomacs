@@ -443,7 +443,7 @@ func drawStatusLine(screen term.Screen, buf *Buffer) {
 	if buf.Modified {
 		mod = " [Modified]"
 	}
-	pos := fmt.Sprintf("Line %d, Col %d", buf.CursorR+1, buf.CursorC+1)
+	pos := fmt.Sprintf("Line %d/%d, Col %d", buf.CursorR+1, len(buf.Lines), buf.CursorC+1)
 	left := fmt.Sprintf(" %s%s", name, mod)
 	right := fmt.Sprintf("%s ", pos)
 

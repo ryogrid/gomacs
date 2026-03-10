@@ -3,10 +3,13 @@ package term
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
+	"unicode/utf8"
 	"unsafe"
 )
 
@@ -47,16 +50,18 @@ type Terminal struct {
 	origTermios *termios
 	fd          int
 	events      chan Event
+	posted      chan Event // re-queued events from PostEvent
 	sigwinch    chan os.Signal
 	stopSig     chan struct{}
+	in          io.Reader // input source (os.Stdin by default)
 	// Screen buffer
-	cells    [][]cell // current buffer [row][col]
-	prev     [][]cell // previous buffer for diffing
-	width    int
-	height   int
-	cursorX  int
-	cursorY  int
-	out      *bufio.Writer
+	cells   [][]cell // current buffer [row][col]
+	prev    [][]cell // previous buffer for diffing
+	width   int
+	height  int
+	cursorX int
+	cursorY int
+	out     *bufio.Writer
 }
 
 // NewTerminal creates a new Terminal instance.
@@ -111,12 +116,15 @@ func (t *Terminal) Init() error {
 		}
 	}
 
-	// Set up event channel and SIGWINCH handler.
+	// Set up event channels and SIGWINCH handler.
 	t.events = make(chan Event, 64)
+	t.posted = make(chan Event, 64)
 	t.sigwinch = make(chan os.Signal, 1)
 	t.stopSig = make(chan struct{})
+	t.in = os.Stdin
 	signal.Notify(t.sigwinch, syscall.SIGWINCH)
 	go t.handleSigwinch()
+	go t.readInput()
 
 	return nil
 }
@@ -302,7 +310,207 @@ func (t *Terminal) resize(w, h int) {
 	}
 }
 
-// Stub methods for events (to be implemented in US-005).
+// PollEvent blocks until an event is available and returns it.
+// Re-queued events (via PostEvent) are returned before stdin events.
+func (t *Terminal) PollEvent() Event {
+	select {
+	case ev := <-t.posted:
+		return ev
+	default:
+	}
+	select {
+	case ev := <-t.posted:
+		return ev
+	case ev := <-t.events:
+		return ev
+	}
+}
 
-func (t *Terminal) PollEvent() Event  { return nil }
-func (t *Terminal) PostEvent(ev Event) {}
+// PostEvent re-queues an event to be returned by the next PollEvent() call.
+func (t *Terminal) PostEvent(ev Event) {
+	select {
+	case t.posted <- ev:
+	default:
+	}
+}
+
+// escTimeout is how long to wait after receiving an Esc byte to distinguish
+// a bare Escape press from an Alt+key or ANSI escape sequence.
+const escTimeout = 50 * time.Millisecond
+
+// readInput reads from the input source, parses key events, and sends them
+// to the events channel. It runs in a goroutine started by Init().
+func (t *Terminal) readInput() {
+	buf := make([]byte, 256)
+	for {
+		n, err := t.in.Read(buf)
+		if err != nil || n == 0 {
+			return
+		}
+		t.parseInput(buf[:n])
+	}
+}
+
+// parseInput processes a chunk of bytes into key events.
+func (t *Terminal) parseInput(data []byte) {
+	i := 0
+	for i < len(data) {
+		b := data[i]
+
+		if b == 0x1b { // Escape
+			// Check if there are more bytes in this chunk that form a sequence.
+			if i+1 < len(data) {
+				i = t.parseEscSequence(data, i)
+				continue
+			}
+			// No more bytes in buffer; wait briefly for more.
+			extra := make([]byte, 16)
+			done := make(chan int, 1)
+			go func() {
+				n, _ := t.in.Read(extra)
+				done <- n
+			}()
+			select {
+			case n := <-done:
+				if n > 0 {
+					// Combine with extra bytes and parse as escape sequence.
+					combined := append([]byte{0x1b}, extra[:n]...)
+					t.parseEscSequence(combined, 0)
+				} else {
+					t.sendEvent(NewKeyEvent(KeyEsc, 0, ModNone))
+				}
+			case <-time.After(escTimeout):
+				// Timeout: bare Escape key.
+				t.sendEvent(NewKeyEvent(KeyEsc, 0, ModNone))
+				// The goroutine will eventually read and we need to handle those bytes.
+				go func() {
+					n := <-done
+					if n > 0 {
+						t.parseInput(extra[:n])
+					}
+				}()
+			}
+			i++
+			continue
+		}
+
+		if b == 0x00 { // C-SPC / NUL
+			t.sendEvent(NewKeyEvent(KeyCtrlSpace, 0, ModNone))
+			i++
+			continue
+		}
+
+		if b == 0x09 { // Tab (C-i)
+			t.sendEvent(NewKeyEvent(KeyTab, 0, ModNone))
+			i++
+			continue
+		}
+
+		if b == 0x0d { // Enter (C-m)
+			t.sendEvent(NewKeyEvent(KeyEnter, 0, ModNone))
+			i++
+			continue
+		}
+
+		if b == 0x1f { // C-_
+			t.sendEvent(NewKeyEvent(KeyCtrlUnderscore, 0, ModNone))
+			i++
+			continue
+		}
+
+		if b == 0x7f { // Backspace
+			t.sendEvent(NewKeyEvent(KeyBackspace2, 0, ModNone))
+			i++
+			continue
+		}
+
+		if b >= 0x01 && b <= 0x1a { // C-a through C-z
+			// Map 0x01 -> KeyCtrlA, 0x02 -> KeyCtrlB, etc.
+			key := KeyCtrlA + KeyCode(b-0x01)
+			t.sendEvent(NewKeyEvent(key, 0, ModNone))
+			i++
+			continue
+		}
+
+		// Multi-byte UTF-8 or ASCII printable character.
+		if b >= 0x20 && b < 0x7f {
+			t.sendEvent(NewKeyEvent(KeyRune, rune(b), ModNone))
+			i++
+			continue
+		}
+
+		// Multi-byte UTF-8 sequence.
+		if b >= 0x80 {
+			r, size := utf8.DecodeRune(data[i:])
+			if r == utf8.RuneError && size <= 1 {
+				i++
+				continue
+			}
+			t.sendEvent(NewKeyEvent(KeyRune, r, ModNone))
+			i += size
+			continue
+		}
+
+		// Unknown byte, skip.
+		i++
+	}
+}
+
+// parseEscSequence parses an escape sequence starting at data[i] (which is 0x1b).
+// Returns the index past the consumed bytes.
+func (t *Terminal) parseEscSequence(data []byte, i int) int {
+	if i+1 >= len(data) {
+		t.sendEvent(NewKeyEvent(KeyEsc, 0, ModNone))
+		return i + 1
+	}
+
+	next := data[i+1]
+
+	// CSI sequence: ESC [
+	if next == '[' {
+		if i+2 < len(data) {
+			switch data[i+2] {
+			case 'A':
+				t.sendEvent(NewKeyEvent(KeyUp, 0, ModNone))
+				return i + 3
+			case 'B':
+				t.sendEvent(NewKeyEvent(KeyDown, 0, ModNone))
+				return i + 3
+			case 'C':
+				t.sendEvent(NewKeyEvent(KeyRight, 0, ModNone))
+				return i + 3
+			case 'D':
+				t.sendEvent(NewKeyEvent(KeyLeft, 0, ModNone))
+				return i + 3
+			}
+		}
+		// Unknown CSI sequence, consume ESC [.
+		t.sendEvent(NewKeyEvent(KeyEsc, 0, ModNone))
+		return i + 1
+	}
+
+	// Alt+key: ESC followed by printable character or control character.
+	if next >= 0x20 && next < 0x7f {
+		t.sendEvent(NewKeyEvent(KeyRune, rune(next), ModAlt))
+		return i + 2
+	}
+
+	// Alt + control character
+	if next >= 0x01 && next <= 0x1a {
+		key := KeyCtrlA + KeyCode(next-0x01)
+		t.sendEvent(NewKeyEvent(key, 0, ModAlt))
+		return i + 2
+	}
+
+	// Unknown escape sequence, send bare Esc.
+	t.sendEvent(NewKeyEvent(KeyEsc, 0, ModNone))
+	return i + 1
+}
+
+// sendEvent sends an event to the events channel without blocking.
+func (t *Terminal) sendEvent(ev Event) {
+	select {
+	case t.events <- ev:
+	default:
+	}
+}

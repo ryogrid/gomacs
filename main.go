@@ -567,7 +567,19 @@ func main() {
 							activeWin.ScrollOffset = 0
 						}
 						message = minibufferPrompt
-					case 'k':
+					case '2':
+					// Split current window into two
+					newWin := &Window{
+						Buffer:       activeWin.Buffer,
+						ScrollOffset: activeWin.ScrollOffset,
+					}
+					// Insert new window after the active one
+					idx := activeWindowIdx + 1
+					windows = append(windows, nil)
+					copy(windows[idx+1:], windows[idx:])
+					windows[idx] = newWin
+					recalcWindows(windows, screenHeight)
+				case 'k':
 						currentName := buf.Filename
 						if currentName == "" {
 							currentName = "[No Name]"

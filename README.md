@@ -14,6 +14,8 @@ goomacs provides a familiar Emacs keybinding experience for quick file editing w
 - **Kill ring** -- Consecutive kills accumulate; yank pastes the last kill
 - **Undo** -- Up to 100 levels of undo history (C-_ / C-/)
 - **Tab support** -- Displays tabs with 8-column tab stops
+- **Multiple buffers** -- Open and switch between multiple files (C-x b, C-x C-f, C-x C-b)
+- **Window splitting** -- Split the screen vertically to view multiple buffers at once (C-x 2, C-x o)
 - **Zero dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences, no external libraries
 
 ## Installation
@@ -27,8 +29,9 @@ go build -o goomacs .
 ## Usage
 
 ```bash
-./goomacs                # Open with an empty buffer
-./goomacs filename.txt   # Open an existing file
+./goomacs                          # Open with an empty *scratch* buffer
+./goomacs filename.txt             # Open a single file
+./goomacs file1.go file2.go        # Open multiple files (first is active)
 ```
 
 ## Keybindings
@@ -68,12 +71,25 @@ go build -o goomacs .
 | C-s | Incremental search forward |
 | C-r | Incremental search backward |
 
-### File Operations
+### File / Buffer Operations
 
 | Key | Action |
 |-----|--------|
 | C-x C-s | Save file |
+| C-x C-f | Open file (find-file) |
+| C-x b | Switch buffer by name |
+| C-x C-b | List all open buffers |
+| C-x k | Close (kill) buffer |
 | C-x C-c | Quit (warns on unsaved changes) |
+
+### Window Management
+
+| Key | Action |
+|-----|--------|
+| C-x 2 | Split window vertically (top/bottom) |
+| C-x o | Move focus to next window |
+| C-x 0 | Close current window |
+| C-x 1 | Close all other windows |
 
 ## Status Bar
 

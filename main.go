@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"goomacs/term"
 )
@@ -302,6 +303,64 @@ func main() {
 					} else {
 						return
 					}
+				case term.KeyCtrlB:
+					// Build buffer list content
+					var lines []string
+					for i, b := range buffers {
+						marker := " "
+						if i == activeBufferIdx {
+							marker = ">"
+						}
+						modFlag := " "
+						if b.Modified {
+							modFlag = "*"
+						}
+						name := b.Filename
+						if name == "" {
+							name = "[No Name]"
+						}
+						lines = append(lines, fmt.Sprintf("%s %s %-20s %s", marker, modFlag, name, name))
+					}
+					content := ""
+					for i, l := range lines {
+						if i > 0 {
+							content += "\n"
+						}
+						content += l
+					}
+
+					// Find existing *Buffer List* or create new one
+					var blBuf *Buffer
+					blIdx := -1
+					for i, b := range buffers {
+						if b.Filename == "*Buffer List*" {
+							blBuf = b
+							blIdx = i
+							break
+						}
+					}
+					if blBuf == nil {
+						blBuf = NewBuffer()
+						blBuf.Filename = "*Buffer List*"
+						buffers = append(buffers, blBuf)
+						blIdx = len(buffers) - 1
+					}
+
+					// Update content
+					rawLines := strings.Split(content, "\n")
+					blBuf.Lines = make([][]rune, len(rawLines))
+					for i, rl := range rawLines {
+						blBuf.Lines[i] = []rune(rl)
+					}
+					blBuf.CursorR = 0
+					blBuf.CursorC = 0
+					blBuf.ScrollOffset = 0
+					blBuf.Modified = false
+
+					// Switch to the buffer list buffer
+					previousBufferIdx = activeBufferIdx
+					activeBufferIdx = blIdx
+					buf = buffers[activeBufferIdx]
 				case term.KeyCtrlF:
 					minibufferMode = true
 					minibufferPrompt = "Find file: "

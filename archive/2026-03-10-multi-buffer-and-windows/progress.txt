@@ -1,0 +1,139 @@
+## Codebase Patterns
+- Module name is `goomacs`, so term package imports as `goomacs/term`
+- main.go uses term.Screen interface with term.KeyEvent, term.ResizeEvent, term.Style types
+- Zero external dependencies (pure Go)
+- Buffer struct holds Lines, CursorR/C, ScrollOffset, Modified, Filename, KillRing, Mark, UndoStack
+- Event loop in main.go: PollEvent → dispatch by mode (search/C-x prefix/normal) → redraw
+- Search mode pattern: mode flag, state vars, special key dispatch, C-g cancel
+- Status line at height-2, message line at height-1
+- `buf` is a local alias for `buffers[activeBufferIdx]` — must reassign when switching active buffer
+- `buffers` is `[]*Buffer` slice; `activeBufferIdx` tracks active buffer
+- Tab expansion handled in rendering (bufColToVisualCol)
+- Minibuffer input mode: set `minibufferMode=true`, `minibufferPrompt`, `minibufferCallback` to activate; callback receives input string on Enter
+- C-x prefix plain-char keys: use `case term.KeyRune:` with nested `switch ev.Rune()` for b, k, 0, 1, 2, o
+- Confirm mode (y/n prompts): set `confirmMode=true`, `confirmCallback=func(bool){...}`, set `message` to prompt; handled before kill tracking reset in dispatch order
+- After switching `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]` and update `previousBufferIdx`
+- After switching active buffer, also update `activeWin.Buffer = buf` and `activeWin.ScrollOffset = 0`
+- Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
+- `windows []*Window` and `activeWindowIdx` track window layout; `recalcWindows(windows, screenHeight)` redistributes heights
+- Rendering: drawWindowContent(screen, win, sh) draws buffer in window's row range; drawWindowStatusLine(screen, win, active) draws status
+
+## Progress: Multi-Buffer & Window Splitting
+
+## 2026-03-10 - US-001
+- Replaced single `buf *Buffer` with `buffers []*Buffer` and `activeBufferIdx`
+- Added multi-file CLI argument support (loops over os.Args[1:])
+- Default empty buffer named `*scratch*` when no args given
+- C-x C-c now iterates all buffers checking Modified flag
+- `buf` is still used as a local alias for `buffers[activeBufferIdx]` throughout event loop
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - The `buf` local variable aliases `buffers[activeBufferIdx]` — future stories that switch buffers must update this alias
+  - File uses tabs for indentation throughout
+  - The redraw closure captures `buf` by reference — when switching active buffer, must reassign `buf` before calling redraw
+---
+
+## 2026-03-10 - US-002
+- Added generic minibuffer input mode with state variables: minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback
+- Key dispatch: Enter invokes callback, C-g cancels, Backspace edits input, Rune appends, all other keys ignored
+- Minibuffer mode takes priority over normal key dispatch (inserted before kill tracking reset, after search mode)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Minibuffer activation pattern: set `minibufferMode=true`, `minibufferPrompt="Prompt: "`, `minibufferInput=nil`, `minibufferCallback=func(s string){...}`, then set `message=minibufferPrompt`
+  - The callback can modify `buf`, `activeBufferIdx`, `buffers`, `message` etc. via closure — this is how C-x b, C-x C-f, C-x k will use it
+  - Mode priority order: searchMode → minibufferMode → C-x prefix → normal keys
+---
+
+## 2026-03-10 - US-003
+- Added C-x b to switch buffers via minibuffer input
+- Added `previousBufferIdx` variable to track alternate buffer for empty-input switching
+- C-x b in the C-x prefix handler uses `term.KeyRune` with rune `'b'`
+- Callback handles: empty input (swap to previous buffer), existing buffer name (switch to it), unknown name (create new empty buffer)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x prefix second keys that are plain characters use `case term.KeyRune:` with a nested `switch ev.Rune()` — this pattern applies for C-x b, C-x k, C-x 0, C-x 1, C-x 2, C-x o
+  - `previousBufferIdx` tracks the last active buffer — must be updated in any code that switches `activeBufferIdx`
+  - After changing `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]`
+---
+
+## 2026-03-10 - US-004
+- Added C-x C-f handler in the C-x prefix dispatch section
+- Minibuffer callback checks: empty input (error), existing buffer by filename (switch to it), file on disk (load via NewBufferFromFile), non-existent file (create empty buffer), other errors (show in message line)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x prefix ctrl-key combos (C-s, C-c, C-f) use `case term.KeyCtrlX:` style; plain char combos (b, k, 0, 1, 2, o) use `case term.KeyRune:` with nested `switch ev.Rune()`
+  - Use `os.IsNotExist(err)` to distinguish "file not found" from other errors (permission denied, etc.)
+  - The `message` variable set inside a minibuffer callback persists after the callback returns — the outer `message = minibufferPrompt` only runs when minibuffer mode is first activated, not when the callback fires
+---
+
+## 2026-03-10 - US-005
+- Added C-x C-b handler in the C-x prefix dispatch (case term.KeyCtrlB)
+- Creates/updates a special *Buffer List* buffer with formatted listing of all open buffers
+- Format: `> * name                 path` (> for current buffer, * for modified)
+- Reuses existing *Buffer List* buffer if one already exists; resets cursor/scroll and Modified=false
+- Added `"strings"` import for strings.Split used in content parsing
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x C-b uses `term.KeyCtrlB` in the C-x prefix handler (ctrl combos, not rune)
+  - Special buffers like *Buffer List* should have Modified=false set after content update to avoid save prompts
+  - The Edit tool in Claude Code struggles with tab-indented Go files — using a Python patch script is more reliable for inserting large blocks
+---
+
+## 2026-03-10 - US-006
+- Added C-x k handler in C-x prefix rune dispatch (case 'k')
+- Minibuffer prompt shows default buffer name; callback finds target buffer by name or uses current
+- Added confirm mode (confirmMode bool, confirmCallback func(bool)) for y/n prompts when buffer is modified
+- Confirm mode dispatch: 'y' calls callback(true), 'n' cancels, C-g cancels — inserted after minibuffer dispatch, before kill tracking reset
+- Kill logic: removes buffer from slice, adjusts activeBufferIdx and previousBufferIdx, creates *scratch* if last buffer killed
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Confirm mode is a new sub-mode at priority: searchMode → minibufferMode → confirmMode → C-x prefix → normal
+  - When removing an element from `buffers` slice by index, must adjust both `activeBufferIdx` and `previousBufferIdx` (decrement if they were after the removed index, clamp if at end)
+  - The `killBuffer` closure inside the minibuffer callback captures `targetIdx` — this works because the confirm callback runs synchronously within the same event loop iteration
+---
+
+## 2026-03-10 - US-007
+- Added Window struct with fields: Buffer (*Buffer), ScrollOffset (int), StartRow (int), Height (int)
+- Added Window methods: ViewHeight(), AdjustScroll(), ScrollDown(), ScrollUp()
+- Added recalcWindows() to distribute screen rows evenly among windows
+- Refactored rendering: drawBuffer/drawBufferWithSearch → drawWindowContent, drawStatusLine → drawWindowStatusLine
+- drawWindowContent renders buffer content within window's row range (StartRow to StartRow+ViewHeight-1)
+- drawWindowStatusLine renders status at StartRow+Height-1; active=reverse video, inactive=dashes with default style
+- main() now holds windows []*Window and activeWindowIdx; initially one window occupying full screen minus message line
+- redraw() loops over all windows, adjusting scroll and drawing each; cursor shown only in active window
+- ScrollOffset moved from Buffer to Window; C-v and M-v use activeWin.ScrollDown()/ScrollUp()
+- Terminal resize calls recalcWindows() to redistribute window heights
+- When switching buffers (C-x b, C-x C-f, C-x C-b, C-x k), also update activeWin.Buffer and reset activeWin.ScrollOffset
+- Removed textAreaHeight() function (replaced by Window.ViewHeight())
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - When switching the active buffer, must also update `activeWin.Buffer = buf` and `activeWin.ScrollOffset = 0` to keep window in sync
+  - `activeWin := windows[activeWindowIdx]` is captured at the start of each key event; closures (minibuffer callbacks) capture it by reference so it stays valid
+  - Inactive window status lines use dashes with default (non-reverse) style; active uses spaces with reverse video
+  - recalcWindows distributes `screenHeight - 1` rows (reserving 1 for message line) evenly, with remainder going to earlier windows
+---
+
+## 2026-03-10 - US-008
+- Added C-x 2 handler in C-x prefix rune dispatch (case '2')
+- Creates a new Window with same buffer and scroll offset as active window
+- Inserts new window after active window in the windows slice using copy-based insertion
+- Calls recalcWindows to redistribute heights evenly
+- Active window remains the top half (activeWindowIdx unchanged)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Window splitting is simple: create new Window, insert into slice, recalcWindows handles all height distribution
+  - The `copy(windows[idx+1:], windows[idx:])` pattern inserts into a slice at a given position after `append(windows, nil)` grows it
+  - After split, both windows share the same *Buffer pointer — edits in one are visible in both (just scroll offset differs)
+---
+
+## 2026-03-10 - US-009
+- Added C-x o: cycles activeWindowIdx, updates buf/activeBufferIdx/previousBufferIdx to match new window's buffer
+- Added C-x 0: closes current window (no-op if only one), redistributes heights, updates active buffer to match new window
+- Added C-x 1: closes all windows except current, redistributes heights
+- Updated killBuffer closure: saves killed buffer pointer before removal, then iterates all windows replacing any that displayed the killed buffer
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - When switching windows (C-x o, C-x 0), must sync both `activeWindowIdx` and `activeBufferIdx`/`previousBufferIdx` by finding the window's buffer in the buffers slice
+  - The killBuffer closure needs to handle multi-window: save the killed `*Buffer` pointer before `append(buffers[:i], buffers[i+1:]...)`, then loop all windows replacing references
+  - C-x 0 and C-x 1 only affect the window list, not the buffer list — buffers stay open
+---

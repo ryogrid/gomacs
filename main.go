@@ -579,6 +579,45 @@ func main() {
 					copy(windows[idx+1:], windows[idx:])
 					windows[idx] = newWin
 					recalcWindows(windows, screenHeight)
+				case 'o':
+					// Move focus to next window (cycle)
+					if len(windows) > 1 {
+						activeWindowIdx = (activeWindowIdx + 1) % len(windows)
+						activeWin = windows[activeWindowIdx]
+						buf = activeWin.Buffer
+						for i, b := range buffers {
+							if b == activeWin.Buffer {
+								previousBufferIdx = activeBufferIdx
+								activeBufferIdx = i
+								break
+							}
+						}
+					}
+				case '0':
+					// Close current window (no-op if only one window)
+					if len(windows) > 1 {
+						windows = append(windows[:activeWindowIdx], windows[activeWindowIdx+1:]...)
+						if activeWindowIdx >= len(windows) {
+							activeWindowIdx = len(windows) - 1
+						}
+						recalcWindows(windows, screenHeight)
+						activeWin = windows[activeWindowIdx]
+						buf = activeWin.Buffer
+						for i, b := range buffers {
+							if b == activeWin.Buffer {
+								previousBufferIdx = activeBufferIdx
+								activeBufferIdx = i
+								break
+							}
+						}
+					}
+				case '1':
+					// Close all windows except current
+					if len(windows) > 1 {
+						windows = []*Window{activeWin}
+						activeWindowIdx = 0
+						recalcWindows(windows, screenHeight)
+					}
 				case 'k':
 						currentName := buf.Filename
 						if currentName == "" {
@@ -605,7 +644,8 @@ func main() {
 							}
 
 							killBuffer := func() {
-								killedName := buffers[targetIdx].Filename
+								killedBuf := buffers[targetIdx]
+								killedName := killedBuf.Filename
 								// Remove buffer from list
 								buffers = append(buffers[:targetIdx], buffers[targetIdx+1:]...)
 
@@ -617,8 +657,13 @@ func main() {
 									activeBufferIdx = 0
 									previousBufferIdx = 0
 									buf = buffers[0]
-									activeWin.Buffer = buf
-									activeWin.ScrollOffset = 0
+									// Update all windows displaying the killed buffer
+									for _, w := range windows {
+										if w.Buffer == killedBuf {
+											w.Buffer = buf
+											w.ScrollOffset = 0
+										}
+									}
 									message = fmt.Sprintf("Killed buffer %s", killedName)
 									return
 								}
@@ -643,8 +688,13 @@ func main() {
 								}
 
 								buf = buffers[activeBufferIdx]
-								activeWin.Buffer = buf
-								activeWin.ScrollOffset = 0
+								// Update all windows displaying the killed buffer
+								for _, w := range windows {
+									if w.Buffer == killedBuf {
+										w.Buffer = buf
+										w.ScrollOffset = 0
+									}
+								}
 								message = fmt.Sprintf("Killed buffer %s", killedName)
 							}
 

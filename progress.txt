@@ -54,3 +54,14 @@
   - Tests verify individual attributes (fg, bg, bold, reverse) and combined attributes in one sequence
 ---
 
+## 2026-03-10 - US-004
+- Added HighlightDirty bool field to Buffer struct
+- Set HighlightDirty = true in NewBuffer(), NewBufferFromFile(), and all edit methods: InsertChar, InsertNewline, Backspace, DeleteChar, KillLine, deleteRegion (used by KillRegion), Undo
+- Yank calls InsertChar/InsertNewline which already set the flag, so no separate change needed
+- Files changed: buffer.go
+- **Learnings for future iterations:**
+  - Edit methods that modify Lines have `b.Modified = true` — HighlightDirty follows the same pattern, set right after Modified
+  - Backspace and DeleteChar each have two code paths (within-line and cross-line) that both need the flag
+  - deleteRegion() is the shared implementation for KillRegion — setting the flag there covers KillRegion without needing to set it in KillRegion() itself
+---
+

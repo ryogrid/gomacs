@@ -75,7 +75,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "This is a simple addition to buffer.go. The flag is set in edit methods and will be checked/cleared by the rendering pipeline in the next story."
     },
     {

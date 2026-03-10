@@ -24,6 +24,90 @@ func bufColToVisualCol(line []rune, bufCol int) int {
 	return visualCol
 }
 
+// Window represents a view into a buffer on screen.
+type Window struct {
+	Buffer       *Buffer
+	ScrollOffset int
+	StartRow     int // first screen row
+	Height       int // total rows including status line
+}
+
+// ViewHeight returns the number of rows available for text (excluding the status line).
+func (w *Window) ViewHeight() int {
+	h := w.Height - 1
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// AdjustScroll ensures the cursor is visible within this window's viewport.
+func (w *Window) AdjustScroll() {
+	viewH := w.ViewHeight()
+	if w.Buffer.CursorR < w.ScrollOffset {
+		w.ScrollOffset = w.Buffer.CursorR
+	}
+	if w.Buffer.CursorR >= w.ScrollOffset+viewH {
+		w.ScrollOffset = w.Buffer.CursorR - viewH + 1
+	}
+}
+
+// ScrollDown scrolls the window down by one page.
+func (w *Window) ScrollDown() {
+	viewH := w.ViewHeight()
+	w.ScrollOffset += viewH
+	maxOffset := len(w.Buffer.Lines) - 1
+	if w.ScrollOffset > maxOffset {
+		w.ScrollOffset = maxOffset
+	}
+	if w.Buffer.CursorR < w.ScrollOffset {
+		w.Buffer.CursorR = w.ScrollOffset
+		if w.Buffer.CursorC > len(w.Buffer.Lines[w.Buffer.CursorR]) {
+			w.Buffer.CursorC = len(w.Buffer.Lines[w.Buffer.CursorR])
+		}
+	}
+}
+
+// ScrollUp scrolls the window up by one page.
+func (w *Window) ScrollUp() {
+	viewH := w.ViewHeight()
+	w.ScrollOffset -= viewH
+	if w.ScrollOffset < 0 {
+		w.ScrollOffset = 0
+	}
+	lastVisible := w.ScrollOffset + viewH - 1
+	if lastVisible >= len(w.Buffer.Lines) {
+		lastVisible = len(w.Buffer.Lines) - 1
+	}
+	if w.Buffer.CursorR > lastVisible {
+		w.Buffer.CursorR = lastVisible
+		if w.Buffer.CursorC > len(w.Buffer.Lines[w.Buffer.CursorR]) {
+			w.Buffer.CursorC = len(w.Buffer.Lines[w.Buffer.CursorR])
+		}
+	}
+}
+
+// recalcWindows distributes available screen rows evenly among windows.
+// The last row is reserved for the message line.
+func recalcWindows(windows []*Window, screenHeight int) {
+	available := screenHeight - 1 // reserve 1 row for message line
+	if available < len(windows) {
+		available = len(windows)
+	}
+	n := len(windows)
+	baseH := available / n
+	extra := available % n
+	row := 0
+	for i, w := range windows {
+		w.StartRow = row
+		w.Height = baseH
+		if i < extra {
+			w.Height++
+		}
+		row += w.Height
+	}
+}
+
 func main() {
 	// Load buffers from file arguments or create empty *scratch* buffer.
 	var buffers []*Buffer
@@ -45,6 +129,10 @@ func main() {
 	previousBufferIdx := 0
 	buf := buffers[activeBufferIdx]
 
+	// Create initial window showing the active buffer.
+	windows := []*Window{{Buffer: buf, ScrollOffset: 0}}
+	activeWindowIdx := 0
+
 	screen := term.NewTerminal()
 	if err := screen.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "error initializing screen: %v\n", err)
@@ -53,11 +141,7 @@ func main() {
 	defer screen.Fini()
 
 	_, screenHeight := screen.Size()
-	viewHeight := textAreaHeight(screenHeight)
-	buf.AdjustScroll(viewHeight)
-	drawBuffer(screen, buf)
-	screen.ShowCursor(bufColToVisualCol(buf.Lines[buf.CursorR], buf.CursorC), buf.CursorR-buf.ScrollOffset)
-	screen.Show()
+	recalcWindows(windows, screenHeight)
 
 	var message string      // message to display in message area
 	var prefixCx bool       // true when C-x prefix has been pressed
@@ -80,29 +164,42 @@ func main() {
 	var confirmCallback func(bool) // called with true for y, false for n
 
 	redraw := func() {
-		buf.AdjustScroll(viewHeight)
-		if searchMode && searchHasMatch {
-			drawBufferWithSearch(screen, buf, searchHighlight{
-				active:   true,
-				matchR:   searchMatchR,
-				matchC:   searchMatchC,
-				queryLen: len(searchQuery),
-			})
-		} else {
-			drawBuffer(screen, buf)
+		screen.Clear()
+		activeWin := windows[activeWindowIdx]
+		for i, win := range windows {
+			win.AdjustScroll()
+			isActive := i == activeWindowIdx
+			if isActive && searchMode && searchHasMatch {
+				drawWindowContent(screen, win, searchHighlight{
+					active:   true,
+					matchR:   searchMatchR,
+					matchC:   searchMatchC,
+					queryLen: len(searchQuery),
+				})
+			} else {
+				drawWindowContent(screen, win, searchHighlight{})
+			}
+			drawWindowStatusLine(screen, win, isActive)
 		}
 		drawMessageLine(screen, message)
-		screen.ShowCursor(bufColToVisualCol(buf.Lines[buf.CursorR], buf.CursorC), buf.CursorR-buf.ScrollOffset)
+		screen.ShowCursor(
+			bufColToVisualCol(activeWin.Buffer.Lines[activeWin.Buffer.CursorR], activeWin.Buffer.CursorC),
+			activeWin.Buffer.CursorR-activeWin.ScrollOffset+activeWin.StartRow,
+		)
 		screen.Show()
 	}
+
+	redraw()
 
 	for {
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
 		case *term.KeyEvent:
 			_, screenHeight = screen.Size()
-			viewHeight = textAreaHeight(screenHeight)
+			recalcWindows(windows, screenHeight)
 			message = "" // clear message on next key
+
+			activeWin := windows[activeWindowIdx]
 
 			// Handle search mode
 			if searchMode {
@@ -389,6 +486,8 @@ func main() {
 					previousBufferIdx = activeBufferIdx
 					activeBufferIdx = blIdx
 					buf = buffers[activeBufferIdx]
+					activeWin.Buffer = buf
+					activeWin.ScrollOffset = 0
 				case term.KeyCtrlF:
 					minibufferMode = true
 					minibufferPrompt = "Find file: "
@@ -404,6 +503,8 @@ func main() {
 								previousBufferIdx = activeBufferIdx
 								activeBufferIdx = i
 								buf = buffers[activeBufferIdx]
+								activeWin.Buffer = buf
+								activeWin.ScrollOffset = 0
 								message = fmt.Sprintf("Switch to buffer: %s", input)
 								return
 							}
@@ -425,6 +526,8 @@ func main() {
 						previousBufferIdx = activeBufferIdx
 						activeBufferIdx = len(buffers) - 1
 						buf = buffers[activeBufferIdx]
+						activeWin.Buffer = buf
+						activeWin.ScrollOffset = 0
 					}
 					message = minibufferPrompt
 				case term.KeyRune:
@@ -438,6 +541,8 @@ func main() {
 								// Switch to previous buffer
 								previousBufferIdx, activeBufferIdx = activeBufferIdx, previousBufferIdx
 								buf = buffers[activeBufferIdx]
+								activeWin.Buffer = buf
+								activeWin.ScrollOffset = 0
 								return
 							}
 							// Search for existing buffer by name
@@ -446,6 +551,8 @@ func main() {
 									previousBufferIdx = activeBufferIdx
 									activeBufferIdx = i
 									buf = buffers[activeBufferIdx]
+									activeWin.Buffer = buf
+									activeWin.ScrollOffset = 0
 									return
 								}
 							}
@@ -456,6 +563,8 @@ func main() {
 							previousBufferIdx = activeBufferIdx
 							activeBufferIdx = len(buffers) - 1
 							buf = buffers[activeBufferIdx]
+							activeWin.Buffer = buf
+							activeWin.ScrollOffset = 0
 						}
 						message = minibufferPrompt
 					case 'k':
@@ -482,12 +591,12 @@ func main() {
 									return
 								}
 							}
-							
+
 							killBuffer := func() {
 								killedName := buffers[targetIdx].Filename
 								// Remove buffer from list
 								buffers = append(buffers[:targetIdx], buffers[targetIdx+1:]...)
-								
+
 								// If no buffers left, create *scratch*
 								if len(buffers) == 0 {
 									scratch := NewBuffer()
@@ -496,10 +605,12 @@ func main() {
 									activeBufferIdx = 0
 									previousBufferIdx = 0
 									buf = buffers[0]
+									activeWin.Buffer = buf
+									activeWin.ScrollOffset = 0
 									message = fmt.Sprintf("Killed buffer %s", killedName)
 									return
 								}
-								
+
 								// Adjust activeBufferIdx
 								if targetIdx == activeBufferIdx {
 									if activeBufferIdx >= len(buffers) {
@@ -508,7 +619,7 @@ func main() {
 								} else if targetIdx < activeBufferIdx {
 									activeBufferIdx--
 								}
-								
+
 								// Adjust previousBufferIdx
 								if previousBufferIdx == targetIdx {
 									previousBufferIdx = activeBufferIdx
@@ -518,11 +629,13 @@ func main() {
 								if previousBufferIdx >= len(buffers) {
 									previousBufferIdx = len(buffers) - 1
 								}
-								
+
 								buf = buffers[activeBufferIdx]
+								activeWin.Buffer = buf
+								activeWin.ScrollOffset = 0
 								message = fmt.Sprintf("Killed buffer %s", killedName)
 							}
-							
+
 							// Check if buffer is modified
 							if buffers[targetIdx].Modified {
 								message = "Buffer modified; kill anyway? (y/n)"
@@ -534,7 +647,7 @@ func main() {
 								}
 								return
 							}
-							
+
 							killBuffer()
 						}
 						message = minibufferPrompt
@@ -583,7 +696,7 @@ func main() {
 				redraw()
 				continue
 			case term.KeyCtrlV:
-				buf.ScrollDown(viewHeight)
+				activeWin.ScrollDown()
 			case term.KeyCtrlSpace, term.KeyNUL:
 				buf.SetMark()
 				message = "Mark set"
@@ -628,7 +741,7 @@ func main() {
 				if ev.Modifiers()&term.ModAlt != 0 {
 					switch ev.Rune() {
 					case 'v':
-						buf.ScrollUp(viewHeight)
+						activeWin.ScrollUp()
 					case 'w':
 						buf.CopyRegion()
 						message = "Region copied"
@@ -647,7 +760,7 @@ func main() {
 				if kev, ok := nextEv.(*term.KeyEvent); ok && kev.Key() == term.KeyRune {
 					switch kev.Rune() {
 					case 'v':
-						buf.ScrollUp(viewHeight)
+						activeWin.ScrollUp()
 					case 'w':
 						buf.CopyRegion()
 						message = "Region copied"
@@ -662,19 +775,10 @@ func main() {
 		case *term.ResizeEvent:
 			screen.Sync()
 			_, screenHeight = screen.Size()
-			viewHeight = textAreaHeight(screenHeight)
+			recalcWindows(windows, screenHeight)
 			redraw()
 		}
 	}
-}
-
-// textAreaHeight returns the number of rows available for text (excluding status and message lines).
-func textAreaHeight(screenHeight int) int {
-	h := screenHeight - 2
-	if h < 1 {
-		h = 1
-	}
-	return h
 }
 
 // searchHighlight holds the state for highlighting a search match during rendering.
@@ -685,19 +789,15 @@ type searchHighlight struct {
 	queryLen int
 }
 
-// drawBuffer renders the buffer content onto the screen, accounting for scroll offset.
-func drawBuffer(screen term.Screen, buf *Buffer) {
-	drawBufferWithSearch(screen, buf, searchHighlight{})
-}
+// drawWindowContent renders a window's buffer content within its row range.
+func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
+	width, _ := screen.Size()
+	viewH := win.ViewHeight()
+	buf := win.Buffer
 
-// drawBufferWithSearch renders the buffer with optional search match highlighting.
-func drawBufferWithSearch(screen term.Screen, buf *Buffer, sh searchHighlight) {
-	screen.Clear()
-	width, height := screen.Size()
-	textH := textAreaHeight(height)
-
-	for row := 0; row < textH; row++ {
-		bufRow := row + buf.ScrollOffset
+	for row := 0; row < viewH; row++ {
+		screenRow := win.StartRow + row
+		bufRow := row + win.ScrollOffset
 		if bufRow >= len(buf.Lines) {
 			break
 		}
@@ -714,17 +814,15 @@ func drawBufferWithSearch(screen term.Screen, buf *Buffer, sh searchHighlight) {
 			if line[bufCol] == '\t' {
 				nextStop := visualCol + tabWidth - (visualCol%tabWidth)
 				for visualCol < nextStop && visualCol < width {
-					screen.SetContent(visualCol, row, ' ', style)
+					screen.SetContent(visualCol, screenRow, ' ', style)
 					visualCol++
 				}
 			} else {
-				screen.SetContent(visualCol, row, line[bufCol], style)
+				screen.SetContent(visualCol, screenRow, line[bufCol], style)
 				visualCol++
 			}
 		}
 	}
-
-	drawStatusLine(screen, buf)
 }
 
 // drawMessageLine renders a message on the last row of the screen.
@@ -742,14 +840,13 @@ func drawMessageLine(screen term.Screen, msg string) {
 	}
 }
 
-// drawStatusLine renders the status line on the second-to-last row with reverse video.
-func drawStatusLine(screen term.Screen, buf *Buffer) {
-	width, height := screen.Size()
-	if height < 2 {
-		return
-	}
-	statusRow := height - 2
+// drawWindowStatusLine renders a window's status line.
+// Active windows use reverse video; inactive windows use dashes with default style.
+func drawWindowStatusLine(screen term.Screen, win *Window, active bool) {
+	width, _ := screen.Size()
+	statusRow := win.StartRow + win.Height - 1
 
+	buf := win.Buffer
 	name := buf.Filename
 	if name == "" {
 		name = "[No Name]"
@@ -763,10 +860,15 @@ func drawStatusLine(screen term.Screen, buf *Buffer) {
 	right := fmt.Sprintf("%s ", pos)
 
 	style := term.StyleDefault.Reverse(true)
+	fillChar := ' '
+	if !active {
+		style = term.StyleDefault
+		fillChar = '-'
+	}
 
-	// Fill entire status line with reverse video
+	// Fill entire status line
 	for col := 0; col < width; col++ {
-		screen.SetContent(col, statusRow, ' ', style)
+		screen.SetContent(col, statusRow, fillChar, style)
 	}
 	// Draw left-aligned text
 	for i, ch := range []rune(left) {

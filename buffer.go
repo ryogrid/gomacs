@@ -29,13 +29,15 @@ type Buffer struct {
 	MarkR        int      // mark row
 	MarkC        int      // mark column
 	MarkActive   bool     // true when mark is set and region is active
-	UndoStack    []undoEntry
+	UndoStack      []undoEntry
+	HighlightDirty bool // true when buffer content changed and needs re-highlighting
 }
 
 // NewBuffer creates a new empty buffer with one empty line.
 func NewBuffer() *Buffer {
 	return &Buffer{
-		Lines: [][]rune{{}},
+		Lines:          [][]rune{{}},
+		HighlightDirty: true,
 	}
 }
 
@@ -57,8 +59,9 @@ func NewBufferFromFile(filename string) (*Buffer, error) {
 		lines = [][]rune{{}}
 	}
 	return &Buffer{
-		Lines:    lines,
-		Filename: filename,
+		Lines:          lines,
+		Filename:       filename,
+		HighlightDirty: true,
 	}, nil
 }
 
@@ -72,6 +75,7 @@ func (b *Buffer) InsertChar(ch rune) {
 	b.Lines[b.CursorR] = newLine
 	b.CursorC++
 	b.Modified = true
+	b.HighlightDirty = true
 }
 
 // InsertNewline splits the current line at the cursor position.
@@ -94,6 +98,7 @@ func (b *Buffer) InsertNewline() {
 	b.CursorR++
 	b.CursorC = 0
 	b.Modified = true
+	b.HighlightDirty = true
 }
 
 // Backspace deletes the character before the cursor. If at the beginning of a line,
@@ -107,6 +112,7 @@ func (b *Buffer) Backspace() {
 		b.Lines[b.CursorR] = newLine
 		b.CursorC--
 		b.Modified = true
+		b.HighlightDirty = true
 	} else if b.CursorR > 0 {
 		// Join with previous line.
 		prevLine := b.Lines[b.CursorR-1]
@@ -123,6 +129,7 @@ func (b *Buffer) Backspace() {
 		b.CursorR--
 		b.CursorC = newCol
 		b.Modified = true
+		b.HighlightDirty = true
 	}
 }
 
@@ -303,6 +310,7 @@ func (b *Buffer) Undo() bool {
 	b.CursorR = entry.CursorR
 	b.CursorC = entry.CursorC
 	b.Modified = true
+	b.HighlightDirty = true
 	return true
 }
 
@@ -331,6 +339,7 @@ func (b *Buffer) KillLine() {
 		return
 	}
 	b.Modified = true
+	b.HighlightDirty = true
 	b.lastKill = true
 }
 
@@ -469,6 +478,7 @@ func (b *Buffer) deleteRegion() {
 	b.CursorR = startR
 	b.CursorC = startC
 	b.Modified = true
+	b.HighlightDirty = true
 }
 
 // InRegion returns true if the given buffer position (row, col) is within the active region.
@@ -586,6 +596,7 @@ func (b *Buffer) DeleteChar() {
 		copy(newLine[b.CursorC:], line[b.CursorC+1:])
 		b.Lines[b.CursorR] = newLine
 		b.Modified = true
+		b.HighlightDirty = true
 	} else if b.CursorR < len(b.Lines)-1 {
 		// Join next line to current line.
 		nextLine := b.Lines[b.CursorR+1]
@@ -597,5 +608,6 @@ func (b *Buffer) DeleteChar() {
 		// Remove next line.
 		b.Lines = append(b.Lines[:b.CursorR+1], b.Lines[b.CursorR+2:]...)
 		b.Modified = true
+		b.HighlightDirty = true
 	}
 }

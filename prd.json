@@ -19,7 +19,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This is a foundational change. Add the fields and state variable but keep all existing behavior identical. The new fields are set but not yet used by rendering (that comes in later stories). Make sure recalcWindows always sets StartCol and Width even in vertical mode."
     },
     {

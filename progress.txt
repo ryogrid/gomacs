@@ -16,3 +16,12 @@
 
 ## Progress: Horizontal Window Split
 
+## 2026-03-10 - US-001
+- What was implemented: Split orientation state (`splitMode` var) and Window struct fields (`StartCol`, `Width`) were already present on master from prior work
+- Verified all acceptance criteria: splitMode defaults to "vertical", StartCol/Width set in recalcWindows, splitMode resets when window count reaches 1, existing C-x 2/o/0/1 behavior unchanged, go build passes
+- Files changed: None (already implemented)
+- **Learnings for future iterations:**
+  - recalcWindows already accepts both screenWidth and screenHeight parameters
+  - splitMode resets happen in C-x 0 (line 617) and C-x 1 (line 635) handlers
+  - C-x 2 handler is at the `case '2':` inside `case term.KeyRune:` inside the C-x prefix block
+---

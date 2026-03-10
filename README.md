@@ -113,7 +113,7 @@ goomacs/
 ├── term/                # Pure Go terminal backend
 │   ├── screen.go        # Screen interface, Event types, Style, KeyCode constants
 │   ├── terminal.go      # Terminal implementation (raw mode, ANSI rendering, input parsing)
-│   └── terminal_test.go # Terminal backend tests (16 tests)
+│   └── terminal_test.go # Terminal backend tests (26 tests)
 └── impl_docs/           # Implementation documentation
     ├── architecture.md  # Architecture overview with diagrams
     ├── buffer.md        # Buffer data structure documentation

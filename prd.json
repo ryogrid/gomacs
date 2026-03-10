@@ -55,7 +55,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Track a 'previousBufferIdx' or 'alternateBuffer' to enable quick switching with empty input. Use the minibuffer callback from US-002."
     },
     {

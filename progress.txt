@@ -10,6 +10,8 @@
 - `buffers` is `[]*Buffer` slice; `activeBufferIdx` tracks active buffer
 - Tab expansion handled in rendering (bufColToVisualCol)
 - Minibuffer input mode: set `minibufferMode=true`, `minibufferPrompt`, `minibufferCallback` to activate; callback receives input string on Enter
+- C-x prefix plain-char keys: use `case term.KeyRune:` with nested `switch ev.Rune()` for b, k, 0, 1, 2, o
+- After switching `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]` and update `previousBufferIdx`
 
 ## Progress: Multi-Buffer & Window Splitting
 
@@ -35,4 +37,16 @@
   - Minibuffer activation pattern: set `minibufferMode=true`, `minibufferPrompt="Prompt: "`, `minibufferInput=nil`, `minibufferCallback=func(s string){...}`, then set `message=minibufferPrompt`
   - The callback can modify `buf`, `activeBufferIdx`, `buffers`, `message` etc. via closure — this is how C-x b, C-x C-f, C-x k will use it
   - Mode priority order: searchMode → minibufferMode → C-x prefix → normal keys
+---
+
+## 2026-03-10 - US-003
+- Added C-x b to switch buffers via minibuffer input
+- Added `previousBufferIdx` variable to track alternate buffer for empty-input switching
+- C-x b in the C-x prefix handler uses `term.KeyRune` with rune `'b'`
+- Callback handles: empty input (swap to previous buffer), existing buffer name (switch to it), unknown name (create new empty buffer)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x prefix second keys that are plain characters use `case term.KeyRune:` with a nested `switch ev.Rune()` — this pattern applies for C-x b, C-x k, C-x 0, C-x 1, C-x 2, C-x o
+  - `previousBufferIdx` tracks the last active buffer — must be updated in any code that switches `activeBufferIdx`
+  - After changing `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]`
 ---

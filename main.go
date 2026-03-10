@@ -69,6 +69,11 @@ func main() {
 	var searchMatchC int    // col of current match (for highlight)
 	var searchHasMatch bool // true if current query has a match
 
+	var minibufferMode bool              // true when minibuffer input is active
+	var minibufferPrompt string          // prompt shown before input
+	var minibufferInput []rune           // current input text
+	var minibufferCallback func(string)  // called with input on Enter
+
 	redraw := func() {
 		buf.AdjustScroll(viewHeight)
 		if searchMode && searchHasMatch {
@@ -220,6 +225,39 @@ func main() {
 					screen.PostEvent(ev)
 					redraw()
 					continue
+				}
+				redraw()
+				continue
+			}
+
+			// Handle minibuffer input mode
+			if minibufferMode {
+				switch ev.Key() {
+				case term.KeyEnter:
+					input := string(minibufferInput)
+					cb := minibufferCallback
+					minibufferMode = false
+					minibufferInput = nil
+					minibufferCallback = nil
+					message = ""
+					if cb != nil {
+						cb(input)
+					}
+				case term.KeyCtrlG:
+					minibufferMode = false
+					minibufferInput = nil
+					minibufferCallback = nil
+					message = "Quit"
+				case term.KeyBackspace, term.KeyBackspace2:
+					if len(minibufferInput) > 0 {
+						minibufferInput = minibufferInput[:len(minibufferInput)-1]
+					}
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyRune:
+					minibufferInput = append(minibufferInput, ev.Rune())
+					message = minibufferPrompt + string(minibufferInput)
+				default:
+					// All other keys are ignored in minibuffer mode
 				}
 				redraw()
 				continue

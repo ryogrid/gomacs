@@ -24,18 +24,24 @@ func bufColToVisualCol(line []rune, bufCol int) int {
 }
 
 func main() {
-	// Load buffer from file argument or create empty buffer.
-	var buf *Buffer
+	// Load buffers from file arguments or create empty *scratch* buffer.
+	var buffers []*Buffer
 	if len(os.Args) > 1 {
-		var err error
-		buf, err = NewBufferFromFile(os.Args[1])
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error opening file: %v\n", err)
-			os.Exit(1)
+		for _, filename := range os.Args[1:] {
+			b, err := NewBufferFromFile(filename)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error opening file: %v\n", err)
+				os.Exit(1)
+			}
+			buffers = append(buffers, b)
 		}
 	} else {
-		buf = NewBuffer()
+		scratch := NewBuffer()
+		scratch.Filename = "*scratch*"
+		buffers = append(buffers, scratch)
 	}
+	activeBufferIdx := 0
+	buf := buffers[activeBufferIdx]
 
 	screen := term.NewTerminal()
 	if err := screen.Init(); err != nil {
@@ -244,7 +250,14 @@ func main() {
 						message = fmt.Sprintf("Saved %s", buf.Filename)
 					}
 				case term.KeyCtrlC:
-					if buf.Modified && !quitWarned {
+					anyModified := false
+					for _, b := range buffers {
+						if b.Modified {
+							anyModified = true
+							break
+						}
+					}
+					if anyModified && !quitWarned {
 						message = "Modified buffers exist; exit anyway? (C-x C-c to confirm)"
 						quitWarned = true
 					} else {

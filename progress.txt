@@ -50,3 +50,13 @@
   - `previousBufferIdx` tracks the last active buffer — must be updated in any code that switches `activeBufferIdx`
   - After changing `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]`
 ---
+
+## 2026-03-10 - US-004
+- Added C-x C-f handler in the C-x prefix dispatch section
+- Minibuffer callback checks: empty input (error), existing buffer by filename (switch to it), file on disk (load via NewBufferFromFile), non-existent file (create empty buffer), other errors (show in message line)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x prefix ctrl-key combos (C-s, C-c, C-f) use `case term.KeyCtrlX:` style; plain char combos (b, k, 0, 1, 2, o) use `case term.KeyRune:` with nested `switch ev.Rune()`
+  - Use `os.IsNotExist(err)` to distinguish "file not found" from other errors (permission denied, etc.)
+  - The `message` variable set inside a minibuffer callback persists after the callback returns — the outer `message = minibufferPrompt` only runs when minibuffer mode is first activated, not when the callback fires
+---

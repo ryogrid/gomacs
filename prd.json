@@ -72,7 +72,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Use NewBufferFromFile() for existing files. Compare against buf.Filename for each buffer to detect duplicates. For new files, create NewBuffer() and set its Filename field."
     },
     {

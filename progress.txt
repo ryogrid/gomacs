@@ -7,6 +7,8 @@
 - showForTest() in terminal_test.go uses writeStyledCell() helper — Show() and showForTest() share rendering logic
 - Style is now a struct (fg Color, bg Color, reverse bool, bold bool); StyleDefault is a var, not const
 - writeStyledCell() on Terminal emits combined ANSI sequence: bold, fg 256-color, bg 256-color, reverse in one \033[...m block, then resets with \033[0m
+- Highlighter in highlight.go: NewHighlighter(filename) → nil if no lexer; Highlight(lines) caches [][]term.Style; StyleAt(row,col) returns cached style
+- Chroma v2 API: lexers.Match(), chroma.Coalesce(), styles.Get(), lexer.Tokenise(), iter.Tokens(), style.Get(tok.Type)
 - drawWindowContent(screen, win, sh) renders buffer content in window's row range
 - Tab expansion handled in rendering (bufColToVisualCol)
 - `buf` is a local alias for `buffers[activeBufferIdx]`
@@ -25,6 +27,19 @@
   - StyleDefault changed from const to var — all existing call sites (main.go, tests) work without changes
   - showForTest() in terminal_test.go duplicates Show() rendering logic — when updating Show() rendering (US-002), must also update showForTest()
   - Test format strings using %d for Style need to change to %v since it's now a struct
+---
+
+## 2026-03-10 - US-003
+- Created highlight.go with Highlighter struct, NewHighlighter(), Highlight(), StyleAt()
+- Added chroma/v2 dependency (v2.23.1) via go get
+- Implemented manual RGB→256-color conversion (rgbTo256, colorCubeIndex) since chroma v2 Colour lacks Nearest256()
+- Uses chroma.Coalesce(lexer) for token merging, styles.Get("monokai") for theme
+- Files changed: highlight.go, go.mod, go.sum
+- **Learnings for future iterations:**
+  - Chroma v2 Colour has no Nearest256() method — must manually convert via RGB→6x6x6 cube + grayscale ramp
+  - Chroma Colour.IsSet() checks if colour is non-zero; Red()/Green()/Blue() extract components
+  - chroma.StyleEntry.Bold is a tristate (Yes/No/Pass) — check == chroma.Yes, not just bool
+  - lexers.Match(filename) returns nil for unknown extensions — caller must handle nil
 ---
 
 ## 2026-03-10 - US-002

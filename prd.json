@@ -60,7 +60,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Chroma v2 API: lexers.Match(filename) for auto-detection, chroma.Coalesce(lexer) to merge tokens, styles.Get('monokai') for theme. Token iteration: lexer.Tokenise(nil, source) returns an Iterator; call Tokens() to get []Token. Each Token has Type and Value; use style.Get(token.Type) to get the chroma.StyleEntry with Colour and Bold fields. Use Colour.Nearest256() or manual mapping for 256-color index."
     },
     {

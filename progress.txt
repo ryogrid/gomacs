@@ -125,3 +125,15 @@
   - The `copy(windows[idx+1:], windows[idx:])` pattern inserts into a slice at a given position after `append(windows, nil)` grows it
   - After split, both windows share the same *Buffer pointer — edits in one are visible in both (just scroll offset differs)
 ---
+
+## 2026-03-10 - US-009
+- Added C-x o: cycles activeWindowIdx, updates buf/activeBufferIdx/previousBufferIdx to match new window's buffer
+- Added C-x 0: closes current window (no-op if only one), redistributes heights, updates active buffer to match new window
+- Added C-x 1: closes all windows except current, redistributes heights
+- Updated killBuffer closure: saves killed buffer pointer before removal, then iterates all windows replacing any that displayed the killed buffer
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - When switching windows (C-x o, C-x 0), must sync both `activeWindowIdx` and `activeBufferIdx`/`previousBufferIdx` by finding the window's buffer in the buffers slice
+  - The killBuffer closure needs to handle multi-window: save the killed `*Buffer` pointer before `append(buffers[:i], buffers[i+1:]...)`, then loop all windows replacing references
+  - C-x 0 and C-x 1 only affect the window list, not the buffer list — buffers stay open
+---

@@ -162,7 +162,7 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "For C-x 0, remove the active window from the windows list and adjust activeWindowIdx. For C-x 1, replace the windows list with just the active window. Always recalculate window heights after changes."
     }
   ]

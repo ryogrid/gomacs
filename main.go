@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/gdamore/tcell/v2"
+	"gomacs/term"
 )
 
 func main() {
@@ -21,12 +21,7 @@ func main() {
 		buf = NewBuffer()
 	}
 
-	screen, err := tcell.NewScreen()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating screen: %v\n", err)
-		os.Exit(1)
-	}
-
+	screen := term.NewTerminal()
 	if err := screen.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "error initializing screen: %v\n", err)
 		os.Exit(1)
@@ -72,7 +67,7 @@ func main() {
 	for {
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
-		case *tcell.EventKey:
+		case *term.KeyEvent:
 			_, screenHeight = screen.Size()
 			viewHeight = textAreaHeight(screenHeight)
 			message = "" // clear message on next key
@@ -80,7 +75,7 @@ func main() {
 			// Handle search mode
 			if searchMode {
 				switch ev.Key() {
-				case tcell.KeyCtrlS:
+				case term.KeyCtrlS:
 					// Search forward for next match
 					searchForward = true
 					if len(searchQuery) > 0 {
@@ -103,7 +98,7 @@ func main() {
 							searchHasMatch = false
 						}
 					}
-				case tcell.KeyCtrlR:
+				case term.KeyCtrlR:
 					// Search backward for previous match
 					searchForward = false
 					if len(searchQuery) > 0 {
@@ -119,19 +114,19 @@ func main() {
 							searchHasMatch = false
 						}
 					}
-				case tcell.KeyCtrlG:
+				case term.KeyCtrlG:
 					// Cancel search, restore original position
 					buf.CursorR = searchOrigR
 					buf.CursorC = searchOrigC
 					searchMode = false
 					searchHasMatch = false
 					message = "Quit"
-				case tcell.KeyEnter:
+				case term.KeyEnter:
 					// Accept search result, exit search mode
 					searchMode = false
 					searchHasMatch = false
 					message = ""
-				case tcell.KeyBackspace, tcell.KeyBackspace2:
+				case term.KeyBackspace, term.KeyBackspace2:
 					// Delete last character from search query
 					if len(searchQuery) > 0 {
 						searchQuery = searchQuery[:len(searchQuery)-1]
@@ -167,7 +162,7 @@ func main() {
 							}
 						}
 					}
-				case tcell.KeyRune:
+				case term.KeyRune:
 					// Add character to search query
 					searchQuery = append(searchQuery, ev.Rune())
 					var r, c int
@@ -209,12 +204,12 @@ func main() {
 			}
 
 			// Reset consecutive kill tracking for non-kill keys
-			if ev.Key() != tcell.KeyCtrlK {
+			if ev.Key() != term.KeyCtrlK {
 				buf.ClearLastKill()
 			}
 
 			// Reset quit warning unless we're in a C-x prefix sequence
-			if ev.Key() != tcell.KeyCtrlX && !prefixCx {
+			if ev.Key() != term.KeyCtrlX && !prefixCx {
 				quitWarned = false
 			}
 
@@ -222,7 +217,7 @@ func main() {
 			if prefixCx {
 				prefixCx = false
 				switch ev.Key() {
-				case tcell.KeyCtrlS:
+				case term.KeyCtrlS:
 					if err := buf.Save(); err != nil {
 						if err == errNoFilename {
 							message = "No file name"
@@ -232,7 +227,7 @@ func main() {
 					} else {
 						message = fmt.Sprintf("Saved %s", buf.Filename)
 					}
-				case tcell.KeyCtrlC:
+				case term.KeyCtrlC:
 					if buf.Modified && !quitWarned {
 						message = "Modified buffers exist; exit anyway? (C-x C-c to confirm)"
 						quitWarned = true
@@ -245,24 +240,24 @@ func main() {
 			}
 
 			switch ev.Key() {
-			case tcell.KeyCtrlX:
+			case term.KeyCtrlX:
 				prefixCx = true
 				message = "C-x-"
 				redraw()
 				continue
-			case tcell.KeyCtrlF:
+			case term.KeyCtrlF:
 				buf.MoveForward()
-			case tcell.KeyCtrlB:
+			case term.KeyCtrlB:
 				buf.MoveBackward()
-			case tcell.KeyCtrlN:
+			case term.KeyCtrlN:
 				buf.MoveDown()
-			case tcell.KeyCtrlP:
+			case term.KeyCtrlP:
 				buf.MoveUp()
-			case tcell.KeyCtrlA:
+			case term.KeyCtrlA:
 				buf.MoveBeginningOfLine()
-			case tcell.KeyCtrlE:
+			case term.KeyCtrlE:
 				buf.MoveEndOfLine()
-			case tcell.KeyCtrlS:
+			case term.KeyCtrlS:
 				searchMode = true
 				searchForward = true
 				searchQuery = nil
@@ -272,7 +267,7 @@ func main() {
 				message = "I-search: "
 				redraw()
 				continue
-			case tcell.KeyCtrlR:
+			case term.KeyCtrlR:
 				searchMode = true
 				searchForward = false
 				searchQuery = nil
@@ -282,50 +277,50 @@ func main() {
 				message = "I-search backward: "
 				redraw()
 				continue
-			case tcell.KeyCtrlV:
+			case term.KeyCtrlV:
 				buf.ScrollDown(viewHeight)
-			case tcell.KeyCtrlSpace, tcell.KeyNUL:
+			case term.KeyCtrlSpace, term.KeyNUL:
 				buf.SetMark()
 				message = "Mark set"
-			case tcell.KeyCtrlG:
+			case term.KeyCtrlG:
 				buf.DeactivateMark()
 				message = ""
-			case tcell.KeyCtrlW:
+			case term.KeyCtrlW:
 				buf.SaveUndo()
 				buf.KillRegion()
-			case tcell.KeyCtrlUnderscore:
+			case term.KeyCtrlUnderscore:
 				if buf.Undo() {
 					message = "Undo"
 				} else {
 					message = "No further undo information"
 				}
-			case tcell.KeyCtrlK:
+			case term.KeyCtrlK:
 				buf.SaveUndo()
 				buf.KillLine()
 				redraw()
 				continue
-			case tcell.KeyCtrlY:
+			case term.KeyCtrlY:
 				buf.SaveUndo()
 				buf.Yank()
-			case tcell.KeyCtrlD:
+			case term.KeyCtrlD:
 				buf.SaveUndo()
 				buf.DeleteChar()
-			case tcell.KeyEnter:
+			case term.KeyEnter:
 				buf.SaveUndo()
 				buf.InsertNewline()
-			case tcell.KeyBackspace, tcell.KeyBackspace2:
+			case term.KeyBackspace, term.KeyBackspace2:
 				buf.SaveUndo()
 				buf.Backspace()
-			case tcell.KeyRight:
+			case term.KeyRight:
 				buf.MoveForward()
-			case tcell.KeyLeft:
+			case term.KeyLeft:
 				buf.MoveBackward()
-			case tcell.KeyDown:
+			case term.KeyDown:
 				buf.MoveDown()
-			case tcell.KeyUp:
+			case term.KeyUp:
 				buf.MoveUp()
-			case tcell.KeyRune:
-				if ev.Modifiers()&tcell.ModAlt != 0 {
+			case term.KeyRune:
+				if ev.Modifiers()&term.ModAlt != 0 {
 					switch ev.Rune() {
 					case 'v':
 						buf.ScrollUp(viewHeight)
@@ -341,10 +336,10 @@ func main() {
 					buf.SaveUndo()
 					buf.InsertChar(ev.Rune())
 				}
-			case tcell.KeyEsc:
+			case term.KeyEsc:
 				// Handle Esc-prefixed sequences (for terminals that send Esc then key)
 				nextEv := screen.PollEvent()
-				if kev, ok := nextEv.(*tcell.EventKey); ok && kev.Key() == tcell.KeyRune {
+				if kev, ok := nextEv.(*term.KeyEvent); ok && kev.Key() == term.KeyRune {
 					switch kev.Rune() {
 					case 'v':
 						buf.ScrollUp(viewHeight)
@@ -359,7 +354,7 @@ func main() {
 				}
 			}
 			redraw()
-		case *tcell.EventResize:
+		case *term.ResizeEvent:
 			screen.Sync()
 			_, screenHeight = screen.Size()
 			viewHeight = textAreaHeight(screenHeight)
@@ -386,12 +381,12 @@ type searchHighlight struct {
 }
 
 // drawBuffer renders the buffer content onto the screen, accounting for scroll offset.
-func drawBuffer(screen tcell.Screen, buf *Buffer) {
+func drawBuffer(screen term.Screen, buf *Buffer) {
 	drawBufferWithSearch(screen, buf, searchHighlight{})
 }
 
 // drawBufferWithSearch renders the buffer with optional search match highlighting.
-func drawBufferWithSearch(screen tcell.Screen, buf *Buffer, sh searchHighlight) {
+func drawBufferWithSearch(screen term.Screen, buf *Buffer, sh searchHighlight) {
 	screen.Clear()
 	width, height := screen.Size()
 	textH := textAreaHeight(height)
@@ -403,14 +398,14 @@ func drawBufferWithSearch(screen tcell.Screen, buf *Buffer, sh searchHighlight) 
 		}
 		line := buf.Lines[bufRow]
 		for col := 0; col < width && col < len(line); col++ {
-			style := tcell.StyleDefault
+			style := term.StyleDefault
 			if buf.InRegion(bufRow, col) {
 				style = style.Reverse(true)
 			}
 			if sh.active && bufRow == sh.matchR && col >= sh.matchC && col < sh.matchC+sh.queryLen {
 				style = style.Reverse(true)
 			}
-			screen.SetContent(col, row, line[col], nil, style)
+			screen.SetContent(col, row, line[col], style)
 		}
 	}
 
@@ -418,7 +413,7 @@ func drawBufferWithSearch(screen tcell.Screen, buf *Buffer, sh searchHighlight) 
 }
 
 // drawMessageLine renders a message on the last row of the screen.
-func drawMessageLine(screen tcell.Screen, msg string) {
+func drawMessageLine(screen term.Screen, msg string) {
 	width, height := screen.Size()
 	if height < 1 || msg == "" {
 		return
@@ -428,12 +423,12 @@ func drawMessageLine(screen tcell.Screen, msg string) {
 		if i >= width {
 			break
 		}
-		screen.SetContent(i, msgRow, ch, nil, tcell.StyleDefault)
+		screen.SetContent(i, msgRow, ch, term.StyleDefault)
 	}
 }
 
 // drawStatusLine renders the status line on the second-to-last row with reverse video.
-func drawStatusLine(screen tcell.Screen, buf *Buffer) {
+func drawStatusLine(screen term.Screen, buf *Buffer) {
 	width, height := screen.Size()
 	if height < 2 {
 		return
@@ -452,18 +447,18 @@ func drawStatusLine(screen tcell.Screen, buf *Buffer) {
 	left := fmt.Sprintf(" %s%s", name, mod)
 	right := fmt.Sprintf("%s ", pos)
 
-	style := tcell.StyleDefault.Reverse(true)
+	style := term.StyleDefault.Reverse(true)
 
 	// Fill entire status line with reverse video
 	for col := 0; col < width; col++ {
-		screen.SetContent(col, statusRow, ' ', nil, style)
+		screen.SetContent(col, statusRow, ' ', style)
 	}
 	// Draw left-aligned text
 	for i, ch := range []rune(left) {
 		if i >= width {
 			break
 		}
-		screen.SetContent(i, statusRow, ch, nil, style)
+		screen.SetContent(i, statusRow, ch, style)
 	}
 	// Draw right-aligned text
 	startCol := width - len([]rune(right))
@@ -475,6 +470,6 @@ func drawStatusLine(screen tcell.Screen, buf *Buffer) {
 		if col >= width {
 			break
 		}
-		screen.SetContent(col, statusRow, ch, nil, style)
+		screen.SetContent(col, statusRow, ch, style)
 	}
 }

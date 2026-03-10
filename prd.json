@@ -130,7 +130,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "This is the final switchover. All term/ package functionality must be working before this story. The main.go changes are mostly mechanical find-and-replace of tcell types/constants with term equivalents."
     }
   ]

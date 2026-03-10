@@ -7,6 +7,22 @@ import (
 	"gomacs/term"
 )
 
+const tabWidth = 8
+
+// bufColToVisualCol converts a buffer column index to a visual (screen) column
+// for the given line, accounting for tab expansion.
+func bufColToVisualCol(line []rune, bufCol int) int {
+	visualCol := 0
+	for i := 0; i < bufCol && i < len(line); i++ {
+		if line[i] == '\t' {
+			visualCol += tabWidth - (visualCol % tabWidth)
+		} else {
+			visualCol++
+		}
+	}
+	return visualCol
+}
+
 func main() {
 	// Load buffer from file argument or create empty buffer.
 	var buf *Buffer
@@ -32,7 +48,7 @@ func main() {
 	viewHeight := textAreaHeight(screenHeight)
 	buf.AdjustScroll(viewHeight)
 	drawBuffer(screen, buf)
-	screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
+	screen.ShowCursor(bufColToVisualCol(buf.Lines[buf.CursorR], buf.CursorC), buf.CursorR-buf.ScrollOffset)
 	screen.Show()
 
 	var message string      // message to display in message area
@@ -60,7 +76,7 @@ func main() {
 			drawBuffer(screen, buf)
 		}
 		drawMessageLine(screen, message)
-		screen.ShowCursor(buf.CursorC, buf.CursorR-buf.ScrollOffset)
+		screen.ShowCursor(bufColToVisualCol(buf.Lines[buf.CursorR], buf.CursorC), buf.CursorR-buf.ScrollOffset)
 		screen.Show()
 	}
 
@@ -397,15 +413,25 @@ func drawBufferWithSearch(screen term.Screen, buf *Buffer, sh searchHighlight) {
 			break
 		}
 		line := buf.Lines[bufRow]
-		for col := 0; col < width && col < len(line); col++ {
+		visualCol := 0
+		for bufCol := 0; bufCol < len(line) && visualCol < width; bufCol++ {
 			style := term.StyleDefault
-			if buf.InRegion(bufRow, col) {
+			if buf.InRegion(bufRow, bufCol) {
 				style = style.Reverse(true)
 			}
-			if sh.active && bufRow == sh.matchR && col >= sh.matchC && col < sh.matchC+sh.queryLen {
+			if sh.active && bufRow == sh.matchR && bufCol >= sh.matchC && bufCol < sh.matchC+sh.queryLen {
 				style = style.Reverse(true)
 			}
-			screen.SetContent(col, row, line[col], style)
+			if line[bufCol] == '\t' {
+				nextStop := visualCol + tabWidth - (visualCol%tabWidth)
+				for visualCol < nextStop && visualCol < width {
+					screen.SetContent(visualCol, row, ' ', style)
+					visualCol++
+				}
+			} else {
+				screen.SetContent(visualCol, row, line[bufCol], style)
+				visualCol++
+			}
 		}
 	}
 

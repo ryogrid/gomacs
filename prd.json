@@ -37,7 +37,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Mirror the existing C-x 2 implementation in the C-x prefix handler. The key difference is setting splitMode to 'horizontal' and the mutual exclusion check. Use the same insert-after-active pattern as C-x 2."
     },
     {
@@ -54,7 +54,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "recalcWindows currently takes (windows, screenHeight). It needs screenWidth too. Either add the parameter or use a package-level variable. The separator columns are implicit — they are the gaps between windows that will be drawn in a later story."
     },
     {

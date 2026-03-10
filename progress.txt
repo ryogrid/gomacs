@@ -16,6 +16,31 @@
 
 ## Progress: Horizontal Window Split
 
+## 2026-03-10 - US-003
+- What was implemented: Updated recalcWindows to handle horizontal (side-by-side) layout
+- In horizontal mode: available width = screenWidth - (n-1) separators, distributed evenly with remainder to first windows
+- Each window gets StartRow=0, Height=screenHeight-1, StartCol computed as cumulative widths + separator gaps
+- Vertical mode logic unchanged, just moved into else branch
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - recalcWindows now branches on `splitMode == "horizontal" && n > 1`
+  - Separator columns are implicit (+1 gap in col accumulator); actual drawing happens in US-005
+  - In horizontal mode, last window's col calculation leaves no trailing separator (correct)
+---
+
+## 2026-03-10 - US-002
+- What was implemented: C-x 3 horizontal split command with mutual exclusion logic
+- Added case '3' in C-x prefix handler that creates side-by-side windows, sets splitMode to "horizontal"
+- Added mutual exclusion: C-x 2 rejects split when in horizontal mode with multiple windows (and vice versa)
+- Enforced minimum 10-column window width; rejects split with message if too narrow
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x 2 handler is now at case '2' with splitMode guard (lines ~583-601)
+  - C-x 3 handler follows at case '3' (lines ~602-636)
+  - Minimum width check: availableWidth = screenWidth - (newCount-1) separators, each window needs ≥10
+  - splitMode is set to "horizontal" only when splitting from a single window with C-x 3
+---
+
 ## 2026-03-10 - US-001
 - What was implemented: Split orientation state (`splitMode` var) and Window struct fields (`StartCol`, `Width`) were already present on master from prior work
 - Verified all acceptance criteria: splitMode defaults to "vertical", StartCol/Width set in recalcWindows, splitMode resets when window count reaches 1, existing C-x 2/o/0/1 behavior unchanged, go build passes

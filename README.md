@@ -4,7 +4,8 @@ A lightweight, fast-starting Emacs-like terminal text editor written in pure Go.
 
 goomacs provides a familiar Emacs keybinding experience for quick file editing without the overhead of a full Emacs installation. It is designed to be minimal, portable, and easy to use.
 
-<img width="887" height="715" alt="image" src="https://github.com/user-attachments/assets/fa801524-46ab-4a04-806d-6a5437bcbfb7" />
+<img width="883" height="706" alt="image" src="https://github.com/user-attachments/assets/bf947672-a6aa-488d-8064-d9e099baa6d0" />
+
 
 ## Features
 

@@ -16,6 +16,18 @@
 
 ## Progress: Horizontal Window Split
 
+## 2026-03-10 - US-006
+- What was implemented: Added resize-time narrowing protection for horizontal splits
+- On terminal resize in horizontal mode, if windows would be < 10 columns each, rightmost windows are closed iteratively until all fit
+- When window count drops to 1 from closing, splitMode resets to "vertical"
+- C-x 0, C-x 1, C-x o already worked correctly for horizontal splits (no changes needed)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Most of US-006 was already implemented by prior stories (C-x 0/1/o all work on the flat windows slice)
+  - Resize narrowing: close rightmost windows in a loop until `available/n >= 10` where `available = screenWidth - (n-1)`
+  - After closing windows in resize handler, must update buf and activeBufferIdx to match new activeWin
+---
+
 ## 2026-03-10 - US-005
 - What was implemented: Vertical separators between horizontal windows and correct cursor positioning
 - Added separator drawing in redraw(): iterates windows 0..n-2, draws '│' (U+2502) at sepCol = win.StartCol + win.Width for each row 0..screenHeight-2

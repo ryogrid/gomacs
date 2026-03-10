@@ -106,7 +106,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "C-x o already cycles by incrementing activeWindowIdx mod len(windows) — this works for both orientations since windows are stored left-to-right in the slice. C-x 0 and C-x 1 already work on the flat slice; just ensure splitMode resets when window count reaches 1."
     }
   ]

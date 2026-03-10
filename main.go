@@ -518,6 +518,7 @@ func main() {
 								// File doesn't exist: create a new empty buffer with that filename
 								newBuf = NewBuffer()
 								newBuf.Filename = input
+								newBuf.Highlight = NewHighlighter(input)
 								message = fmt.Sprintf("(New file) %s", input)
 							} else {
 								message = fmt.Sprintf("Error: %v", err)
@@ -859,6 +860,12 @@ func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
 	viewH := win.ViewHeight()
 	buf := win.Buffer
 
+	// Re-highlight if content changed.
+	if buf.HighlightDirty && buf.Highlight != nil {
+		buf.Highlight.Highlight(buf.Lines)
+		buf.HighlightDirty = false
+	}
+
 	for row := 0; row < viewH; row++ {
 		screenRow := win.StartRow + row
 		bufRow := row + win.ScrollOffset
@@ -869,6 +876,9 @@ func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
 		visualCol := 0
 		for bufCol := 0; bufCol < len(line) && visualCol < width; bufCol++ {
 			style := term.StyleDefault
+			if buf.Highlight != nil {
+				style = buf.Highlight.StyleAt(bufRow, bufCol)
+			}
 			if buf.InRegion(bufRow, bufCol) {
 				style = style.Reverse(true)
 			}

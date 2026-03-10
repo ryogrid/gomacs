@@ -16,7 +16,8 @@ goomacs provides a familiar Emacs keybinding experience for quick file editing w
 - **Tab support** -- Displays tabs with 8-column tab stops
 - **Multiple buffers** -- Open and switch between multiple files (C-x b, C-x C-f, C-x C-b)
 - **Window splitting** -- Split the screen vertically to view multiple buffers at once (C-x 2, C-x o)
-- **Zero dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences, no external libraries
+- **Syntax highlighting** -- Automatic syntax coloring for source code files using Chroma (monokai theme, 256-color)
+- **Minimal dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences
 
 ## Installation
 
@@ -104,9 +105,10 @@ The status bar at the bottom of the screen shows:
 goomacs/
 ├── main.go              # Event loop, keybinding dispatch, and UI rendering
 ├── buffer.go            # Buffer data structure and editing operations
+├── highlight.go         # Chroma-based syntax highlighting module
 ├── buffer_test.go       # Buffer unit tests (69 tests)
 ├── main_test.go         # Main package tests
-├── go.mod               # Go module definition (zero dependencies)
+├── go.mod               # Go module definition
 ├── term/                # Pure Go terminal backend
 │   ├── screen.go        # Screen interface, Event types, Style, KeyCode constants
 │   ├── terminal.go      # Terminal implementation (raw mode, ANSI rendering, input parsing)
@@ -120,7 +122,9 @@ goomacs/
 
 ## Dependencies
 
-No external dependencies. goomacs uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) for terminal handling via ANSI/VT100 escape sequences.
+- [github.com/alecthomas/chroma/v2](https://github.com/alecthomas/chroma) -- Syntax highlighting (lexers and themes)
+
+All terminal handling uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) via ANSI/VT100 escape sequences.
 
 ## Testing
 

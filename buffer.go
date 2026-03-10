@@ -30,7 +30,8 @@ type Buffer struct {
 	MarkC        int      // mark column
 	MarkActive   bool     // true when mark is set and region is active
 	UndoStack      []undoEntry
-	HighlightDirty bool // true when buffer content changed and needs re-highlighting
+	HighlightDirty bool         // true when buffer content changed and needs re-highlighting
+	Highlight      *Highlighter // syntax highlighter (nil if no lexer matches)
 }
 
 // NewBuffer creates a new empty buffer with one empty line.
@@ -58,11 +59,13 @@ func NewBufferFromFile(filename string) (*Buffer, error) {
 	if len(lines) == 0 {
 		lines = [][]rune{{}}
 	}
-	return &Buffer{
+	b := &Buffer{
 		Lines:          lines,
 		Filename:       filename,
 		HighlightDirty: true,
-	}, nil
+	}
+	b.Highlight = NewHighlighter(filename)
+	return b, nil
 }
 
 // InsertChar inserts a rune at the current cursor position and advances the cursor.

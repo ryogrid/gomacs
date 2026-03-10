@@ -87,7 +87,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Create a formatted text buffer. The > marker should indicate which buffer was active before opening the buffer list. Regenerate content each time C-x C-b is pressed."
     },
     {

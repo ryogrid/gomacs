@@ -60,3 +60,16 @@
   - Use `os.IsNotExist(err)` to distinguish "file not found" from other errors (permission denied, etc.)
   - The `message` variable set inside a minibuffer callback persists after the callback returns — the outer `message = minibufferPrompt` only runs when minibuffer mode is first activated, not when the callback fires
 ---
+
+## 2026-03-10 - US-005
+- Added C-x C-b handler in the C-x prefix dispatch (case term.KeyCtrlB)
+- Creates/updates a special *Buffer List* buffer with formatted listing of all open buffers
+- Format: `> * name                 path` (> for current buffer, * for modified)
+- Reuses existing *Buffer List* buffer if one already exists; resets cursor/scroll and Modified=false
+- Added `"strings"` import for strings.Split used in content parsing
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x C-b uses `term.KeyCtrlB` in the C-x prefix handler (ctrl combos, not rune)
+  - Special buffers like *Buffer List* should have Modified=false set after content update to avoid save prompts
+  - The Edit tool in Claude Code struggles with tab-indented Go files — using a Python patch script is more reliable for inserting large blocks
+---

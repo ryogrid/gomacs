@@ -10,6 +10,10 @@ import (
 
 const tabWidth = 8
 
+// splitMode tracks the current window split orientation.
+// It is "vertical" (top/bottom, C-x 2) or "horizontal" (side-by-side, C-x 3).
+var splitMode = "vertical"
+
 // bufColToVisualCol converts a buffer column index to a visual (screen) column
 // for the given line, accounting for tab expansion.
 func bufColToVisualCol(line []rune, bufCol int) int {
@@ -30,6 +34,8 @@ type Window struct {
 	ScrollOffset int
 	StartRow     int // first screen row
 	Height       int // total rows including status line
+	StartCol     int // first screen column (used in horizontal split)
+	Width        int // columns allocated to this window
 }
 
 // ViewHeight returns the number of rows available for text (excluding the status line).
@@ -87,9 +93,11 @@ func (w *Window) ScrollUp() {
 	}
 }
 
-// recalcWindows distributes available screen rows evenly among windows.
+// recalcWindows distributes available screen space evenly among windows.
 // The last row is reserved for the message line.
-func recalcWindows(windows []*Window, screenHeight int) {
+// In vertical mode, windows stack top-to-bottom with full width.
+// In horizontal mode, windows are placed side-by-side (handled in later stories).
+func recalcWindows(windows []*Window, screenWidth, screenHeight int) {
 	available := screenHeight - 1 // reserve 1 row for message line
 	if available < len(windows) {
 		available = len(windows)
@@ -104,6 +112,8 @@ func recalcWindows(windows []*Window, screenHeight int) {
 		if i < extra {
 			w.Height++
 		}
+		w.StartCol = 0
+		w.Width = screenWidth
 		row += w.Height
 	}
 }
@@ -140,8 +150,8 @@ func main() {
 	}
 	defer screen.Fini()
 
-	_, screenHeight := screen.Size()
-	recalcWindows(windows, screenHeight)
+	screenWidth, screenHeight := screen.Size()
+	recalcWindows(windows, screenWidth, screenHeight)
 
 	var message string      // message to display in message area
 	var prefixCx bool       // true when C-x prefix has been pressed
@@ -197,8 +207,8 @@ func main() {
 		ev := screen.PollEvent()
 		switch ev := ev.(type) {
 		case *term.KeyEvent:
-			_, screenHeight = screen.Size()
-			recalcWindows(windows, screenHeight)
+			screenWidth, screenHeight = screen.Size()
+			recalcWindows(windows, screenWidth, screenHeight)
 			message = "" // clear message on next key
 
 			activeWin := windows[activeWindowIdx]
@@ -581,7 +591,7 @@ func main() {
 					windows = append(windows, nil)
 					copy(windows[idx+1:], windows[idx:])
 					windows[idx] = newWin
-					recalcWindows(windows, screenHeight)
+					recalcWindows(windows, screenWidth, screenHeight)
 				case 'o':
 					// Move focus to next window (cycle)
 					if len(windows) > 1 {
@@ -603,7 +613,10 @@ func main() {
 						if activeWindowIdx >= len(windows) {
 							activeWindowIdx = len(windows) - 1
 						}
-						recalcWindows(windows, screenHeight)
+						if len(windows) == 1 {
+							splitMode = "vertical"
+						}
+						recalcWindows(windows, screenWidth, screenHeight)
 						activeWin = windows[activeWindowIdx]
 						buf = activeWin.Buffer
 						for i, b := range buffers {
@@ -619,7 +632,8 @@ func main() {
 					if len(windows) > 1 {
 						windows = []*Window{activeWin}
 						activeWindowIdx = 0
-						recalcWindows(windows, screenHeight)
+						splitMode = "vertical"
+						recalcWindows(windows, screenWidth, screenHeight)
 					}
 				case 'k':
 						currentName := buf.Filename
@@ -839,8 +853,8 @@ func main() {
 			redraw()
 		case *term.ResizeEvent:
 			screen.Sync()
-			_, screenHeight = screen.Size()
-			recalcWindows(windows, screenHeight)
+			screenWidth, screenHeight = screen.Size()
+			recalcWindows(windows, screenWidth, screenHeight)
 			redraw()
 		}
 	}

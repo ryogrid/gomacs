@@ -1,0 +1,103 @@
+{
+  "project": "goomacs",
+  "branchName": "ralph/syntax-highlighting",
+  "description": "Syntax Highlighting with Chroma - Colorize source code using Chroma lexers, 256-color ANSI output, and monokai theme",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Extend Style type to support foreground/background colors and bold",
+      "description": "As a developer, I need the term.Style type to carry color and bold information so that the rendering pipeline can output colored text.",
+      "acceptanceCriteria": [
+        "Change Style type in term/screen.go from uint8 to a struct with fields: fg (Color), bg (Color), reverse (bool), bold (bool)",
+        "Define Color type as int16 where -1 means 'default/no color' (ColorDefault constant) and 0-255 are 256-color palette indices",
+        "Add methods: Foreground(Color) Style, Background(Color) Style, Bold(bool) Style that return new Style values",
+        "Add accessor methods: Fg() Color, Bg() Color, IsBold() bool",
+        "StyleDefault zero value has ColorDefault for both fg and bg, false for reverse and bold",
+        "Existing Reverse(bool) and IsReverse() methods continue to work",
+        "Update cell struct comparison in terminal.go Show() if needed (Go struct == works for comparable fields)",
+        "Existing tests in term/terminal_test.go pass",
+        "New tests for Foreground(), Background(), Bold(), Fg(), Bg(), IsBold() methods pass",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "This is a breaking change to Style. The cell struct in terminal.go uses Style, but since all fields are comparable, == still works for diff detection in Show(). All SetContent() call sites in main.go pass term.StyleDefault or style.Reverse(true), which continue to work."
+    },
+    {
+      "id": "US-002",
+      "title": "Update terminal rendering to output 256-color ANSI sequences",
+      "description": "As a developer, I need the terminal's Show() method to emit ANSI color escape sequences so that styled cells appear in color.",
+      "acceptanceCriteria": [
+        "Show() emits \\033[38;5;Nm for foreground color N when a cell's fg is not ColorDefault",
+        "Show() emits \\033[48;5;Nm for background color N when a cell's bg is not ColorDefault",
+        "Show() emits \\033[1m for bold when a cell has bold enabled",
+        "Show() emits \\033[7m for reverse video when a cell has reverse enabled",
+        "Show() emits \\033[0m to reset all attributes after each styled cell (any cell that has non-default style)",
+        "Cells with only reverse video (no colors) continue to work as before",
+        "Cells with both color and reverse video render correctly (colors visible through reverse)",
+        "Cells with StyleDefault (no attributes) emit no escape sequences beyond cursor positioning",
+        "Existing terminal rendering tests pass; new test for color ANSI output passes",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Build the ANSI sequence as: reset first if needed, then set all attributes (bold, fg, bg, reverse) in one batch before the character, and reset after. This minimizes escape sequence overhead."
+    },
+    {
+      "id": "US-003",
+      "title": "Add Chroma-based syntax highlighting module",
+      "description": "As a developer, I need a module that tokenizes buffer content using Chroma and produces a per-cell style map so that drawWindowContent can apply syntax colors.",
+      "acceptanceCriteria": [
+        "Run 'go get github.com/alecthomas/chroma/v2' to add Chroma as a dependency",
+        "Create new file highlight.go in the main (goomacs) package",
+        "Define Highlighter struct holding a chroma.Lexer, a *chroma.Style (monokai), and cached result [][]term.Style",
+        "NewHighlighter(filename string) creates a highlighter by calling lexers.Match(filename); returns nil if no lexer matches the file extension",
+        "Highlight(lines [][]rune) method: joins lines into a single string, tokenizes with lexer.Tokenise(), iterates tokens mapping each token's chroma style color to term.Style with Foreground set to nearest 256-color index, and bold if the chroma style entry has Bold; stores result as [][]term.Style",
+        "StyleAt(row, col int) term.Style returns the cached highlight style at the given position, or term.StyleDefault if out of range",
+        "Use chroma/styles.Get('monokai') for the theme",
+        "Use the chroma Color type's method to convert RGB to nearest 256-color palette index",
+        "go build succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Chroma v2 API: lexers.Match(filename) for auto-detection, chroma.Coalesce(lexer) to merge tokens, styles.Get('monokai') for theme. Token iteration: lexer.Tokenise(nil, source) returns an Iterator; call Tokens() to get []Token. Each Token has Type and Value; use style.Get(token.Type) to get the chroma.StyleEntry with Colour and Bold fields. Use Colour.Nearest256() or manual mapping for 256-color index."
+    },
+    {
+      "id": "US-004",
+      "title": "Add highlight dirty flag to Buffer",
+      "description": "As a developer, I need a dirty flag on Buffer so that re-highlighting only happens when content changes.",
+      "acceptanceCriteria": [
+        "Add HighlightDirty bool field to Buffer struct in buffer.go",
+        "Set HighlightDirty = true in all edit methods that modify Lines: InsertChar, InsertNewline, Backspace, DeleteChar, KillLine, KillRegion, Yank, Undo",
+        "NewBuffer() and NewBufferFromFile() set HighlightDirty = true initially",
+        "go test ./... passes (existing buffer tests still pass)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "This is a simple addition to buffer.go. The flag is set in edit methods and will be checked/cleared by the rendering pipeline in the next story."
+    },
+    {
+      "id": "US-005",
+      "title": "Integrate highlighting into buffer and rendering pipeline",
+      "description": "As a user, I want source code files to appear with syntax colors so that I can read code more easily.",
+      "acceptanceCriteria": [
+        "Add a Highlight *Highlighter field to Buffer struct",
+        "When NewBufferFromFile() loads a file, create a Highlighter via NewHighlighter(filename) and attach it to the buffer (nil if no lexer matches)",
+        "When C-x C-f opens a new file, the new buffer gets a Highlighter attached",
+        "In drawWindowContent(), before rendering: if buf.HighlightDirty and buf.Highlight is not nil, call buf.Highlight.Highlight(buf.Lines) and set buf.HighlightDirty = false",
+        "In drawWindowContent(), for each cell: get base style from highlighter via StyleAt(bufRow, bufCol), then apply reverse video on top if the cell is in a region or search match",
+        "Files without a matching Chroma lexer render in default terminal color (no error, no crash)",
+        "Special buffers (*scratch*, *Buffer List*) have nil Highlighter and render normally",
+        "Opening a .go file shows Go syntax highlighting (keywords, strings, comments in distinct colors)",
+        "Update README.md: change 'Zero dependencies' to 'Minimal dependencies' or similar, add 'Syntax highlighting' to features list",
+        "go test ./... passes",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "The key rendering logic change is in drawWindowContent(): instead of always using term.StyleDefault as the base style, use highlighter.StyleAt(row, col) when available. Region/search reverse video is applied on top via style.Reverse(true). The HighlightDirty flag from US-004 prevents re-tokenizing on every redraw."
+    }
+  ]
+}

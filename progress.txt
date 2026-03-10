@@ -6,7 +6,33 @@
 - Event loop in main.go: PollEvent → dispatch by mode (search/C-x prefix/normal) → redraw
 - Search mode pattern: mode flag, state vars, special key dispatch, C-g cancel
 - Status line at height-2, message line at height-1
+- `buf` is a local alias for `buffers[activeBufferIdx]` — must reassign when switching active buffer
+- `buffers` is `[]*Buffer` slice; `activeBufferIdx` tracks active buffer
 - Tab expansion handled in rendering (bufColToVisualCol)
+- Minibuffer input mode: set `minibufferMode=true`, `minibufferPrompt`, `minibufferCallback` to activate; callback receives input string on Enter
 
 ## Progress: Multi-Buffer & Window Splitting
 
+## 2026-03-10 - US-001
+- Replaced single `buf *Buffer` with `buffers []*Buffer` and `activeBufferIdx`
+- Added multi-file CLI argument support (loops over os.Args[1:])
+- Default empty buffer named `*scratch*` when no args given
+- C-x C-c now iterates all buffers checking Modified flag
+- `buf` is still used as a local alias for `buffers[activeBufferIdx]` throughout event loop
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - The `buf` local variable aliases `buffers[activeBufferIdx]` — future stories that switch buffers must update this alias
+  - File uses tabs for indentation throughout
+  - The redraw closure captures `buf` by reference — when switching active buffer, must reassign `buf` before calling redraw
+---
+
+## 2026-03-10 - US-002
+- Added generic minibuffer input mode with state variables: minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback
+- Key dispatch: Enter invokes callback, C-g cancels, Backspace edits input, Rune appends, all other keys ignored
+- Minibuffer mode takes priority over normal key dispatch (inserted before kill tracking reset, after search mode)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Minibuffer activation pattern: set `minibufferMode=true`, `minibufferPrompt="Prompt: "`, `minibufferInput=nil`, `minibufferCallback=func(s string){...}`, then set `message=minibufferPrompt`
+  - The callback can modify `buf`, `activeBufferIdx`, `buffers`, `message` etc. via closure — this is how C-x b, C-x C-f, C-x k will use it
+  - Mode priority order: searchMode → minibufferMode → C-x prefix → normal keys
+---

@@ -19,7 +19,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This is the foundational change. Replace the single 'buf' variable with a buffers slice and activeBufferIdx. Update all references to use the active buffer. The redraw closure, search mode, C-x prefix handling, and status line must all work with the active buffer from the list."
     },
     {
@@ -38,7 +38,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Model this after the existing searchMode pattern in main.go. Add minibufferMode bool, minibufferPrompt string, minibufferInput []rune, minibufferCallback func(string). The callback pattern allows different commands (C-x b, C-x C-f, C-x k) to reuse the same input mode."
     },
     {

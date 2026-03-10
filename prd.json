@@ -19,7 +19,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This story defines types only -- no implementation yet. Keep the interface minimal, matching only what gomacs currently uses from tcell."
     },
     {
@@ -36,7 +36,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Use syscall.SYS_IOCTL with TCGETS/TCSETS for termios on Linux. The syscall package is part of Go stdlib."
     },
     {
@@ -51,7 +51,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "TIOCGWINSZ constant is 0x5413 on Linux. Use syscall.Syscall with SYS_IOCTL."
     },
     {
@@ -71,7 +71,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "ANSI coordinates are 1-based (row 1, col 1 is top-left). Remember to convert from 0-based cell buffer indices."
     },
     {
@@ -89,7 +89,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Use select with time.After for Esc-prefix timeout. Read from os.Stdin into a byte buffer, then decode. PostEvent can use a buffered channel or queue."
     },
     {

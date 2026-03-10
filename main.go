@@ -98,23 +98,46 @@ func (w *Window) ScrollUp() {
 // In vertical mode, windows stack top-to-bottom with full width.
 // In horizontal mode, windows are placed side-by-side (handled in later stories).
 func recalcWindows(windows []*Window, screenWidth, screenHeight int) {
-	available := screenHeight - 1 // reserve 1 row for message line
-	if available < len(windows) {
-		available = len(windows)
-	}
 	n := len(windows)
-	baseH := available / n
-	extra := available % n
-	row := 0
-	for i, w := range windows {
-		w.StartRow = row
-		w.Height = baseH
-		if i < extra {
-			w.Height++
+	if splitMode == "horizontal" && n > 1 {
+		// Horizontal (side-by-side) layout: distribute width evenly.
+		// Reserve 1 column between each pair of adjacent windows for separators.
+		available := screenWidth - (n - 1)
+		if available < n {
+			available = n
 		}
-		w.StartCol = 0
-		w.Width = screenWidth
-		row += w.Height
+		baseW := available / n
+		extra := available % n
+		col := 0
+		for i, w := range windows {
+			w.StartCol = col
+			w.Width = baseW
+			if i < extra {
+				w.Width++
+			}
+			w.StartRow = 0
+			w.Height = screenHeight - 1 // full height minus message line
+			col += w.Width + 1          // +1 for separator column
+		}
+	} else {
+		// Vertical (top/bottom) layout: distribute height evenly.
+		available := screenHeight - 1 // reserve 1 row for message line
+		if available < n {
+			available = n
+		}
+		baseH := available / n
+		extra := available % n
+		row := 0
+		for i, w := range windows {
+			w.StartRow = row
+			w.Height = baseH
+			if i < extra {
+				w.Height++
+			}
+			w.StartCol = 0
+			w.Width = screenWidth
+			row += w.Height
+		}
 	}
 }
 

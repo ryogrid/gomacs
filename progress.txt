@@ -6,10 +6,25 @@
 - Style is currently uint8 with only reverse video support (styleReverse bitmask)
 - cell struct in terminal.go: {ch rune, style Style} — used for diff-based rendering in Show()
 - Show() in terminal.go diffs cells vs prev, emits ANSI cursor positioning + reverse video sequences
+- showForTest() in terminal_test.go duplicates Show() rendering logic — keep them in sync
+- Style is now a struct (fg Color, bg Color, reverse bool, bold bool); StyleDefault is a var, not const
 - drawWindowContent(screen, win, sh) renders buffer content in window's row range
 - Tab expansion handled in rendering (bufColToVisualCol)
 - `buf` is a local alias for `buffers[activeBufferIdx]`
 - Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
 
 ## Progress: Syntax Highlighting
+
+## 2026-03-10 - US-001
+- Changed Style from uint8 to struct with fg (Color), bg (Color), reverse (bool), bold (bool)
+- Added Color type (int16) with ColorDefault = -1
+- Added Foreground(), Background(), Bold() builder methods and Fg(), Bg(), IsBold() accessors
+- StyleDefault is now a var (not const) since structs can't be const in Go
+- Files changed: term/screen.go, term/terminal_test.go
+- **Learnings for future iterations:**
+  - Style is a value type (struct) — Go struct == comparison works for all comparable fields, so cell diff in Show() still works
+  - StyleDefault changed from const to var — all existing call sites (main.go, tests) work without changes
+  - showForTest() in terminal_test.go duplicates Show() rendering logic — when updating Show() rendering (US-002), must also update showForTest()
+  - Test format strings using %d for Style need to change to %v since it's now a struct
+---
 

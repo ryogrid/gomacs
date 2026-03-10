@@ -20,7 +20,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This is a breaking change to Style. The cell struct in terminal.go uses Style, but since all fields are comparable, == still works for diff detection in Show(). All SetContent() call sites in main.go pass term.StyleDefault or style.Reverse(true), which continue to work."
     },
     {

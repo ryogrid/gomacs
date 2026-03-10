@@ -59,27 +59,62 @@ func NewResizeEvent(w, h int) *ResizeEvent {
 	return &ResizeEvent{width: w, height: h}
 }
 
-// Style represents text display style.
-type Style uint8
+// Color represents a 256-color palette index. -1 means default/no color.
+type Color int16
 
 const (
-	// StyleDefault is the zero-value default style.
-	StyleDefault Style = 0
-	styleReverse Style = 1
+	// ColorDefault means no color (use terminal default).
+	ColorDefault Color = -1
 )
+
+// Style represents text display style with foreground/background colors and attributes.
+type Style struct {
+	fg      Color
+	bg      Color
+	reverse bool
+	bold    bool
+}
+
+// StyleDefault is the zero-value default style.
+var StyleDefault = Style{fg: ColorDefault, bg: ColorDefault}
 
 // Reverse returns a new Style with reverse video enabled or disabled.
 func (s Style) Reverse(on bool) Style {
-	if on {
-		return s | styleReverse
-	}
-	return s &^ styleReverse
+	s.reverse = on
+	return s
 }
 
 // IsReverse returns whether reverse video is enabled.
 func (s Style) IsReverse() bool {
-	return s&styleReverse != 0
+	return s.reverse
 }
+
+// Foreground returns a new Style with the given foreground color.
+func (s Style) Foreground(c Color) Style {
+	s.fg = c
+	return s
+}
+
+// Background returns a new Style with the given background color.
+func (s Style) Background(c Color) Style {
+	s.bg = c
+	return s
+}
+
+// Bold returns a new Style with bold enabled or disabled.
+func (s Style) Bold(on bool) Style {
+	s.bold = on
+	return s
+}
+
+// Fg returns the foreground color.
+func (s Style) Fg() Color { return s.fg }
+
+// Bg returns the background color.
+func (s Style) Bg() Color { return s.bg }
+
+// IsBold returns whether bold is enabled.
+func (s Style) IsBold() bool { return s.bold }
 
 // ModMask represents keyboard modifier keys.
 type ModMask int

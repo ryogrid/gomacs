@@ -277,7 +277,7 @@ func TestSetContent(t *testing.T) {
 		t.Errorf("expected 'X' at (3,2), got %q", term.cells[2][3].ch)
 	}
 	if term.cells[2][3].style != StyleDefault {
-		t.Errorf("expected StyleDefault, got %d", term.cells[2][3].style)
+		t.Errorf("expected StyleDefault, got %v", term.cells[2][3].style)
 	}
 
 	// Reverse style
@@ -310,7 +310,7 @@ func TestClear(t *testing.T) {
 	for r := 0; r < 5; r++ {
 		for c := 0; c < 10; c++ {
 			if term.cells[r][c].ch != ' ' || term.cells[r][c].style != StyleDefault {
-				t.Errorf("cell (%d,%d) not cleared: ch=%q style=%d", c, r, term.cells[r][c].ch, term.cells[r][c].style)
+				t.Errorf("cell (%d,%d) not cleared: ch=%q style=%v", c, r, term.cells[r][c].ch, term.cells[r][c].style)
 			}
 		}
 	}
@@ -398,6 +398,73 @@ func TestStyle_Reverse(t *testing.T) {
 	}
 	if norev != StyleDefault {
 		t.Error("Reverse(false) should equal StyleDefault")
+	}
+}
+
+func TestStyle_Foreground(t *testing.T) {
+	s := StyleDefault.Foreground(196)
+	if s.Fg() != 196 {
+		t.Errorf("expected fg 196, got %d", s.Fg())
+	}
+	if s.Bg() != ColorDefault {
+		t.Errorf("expected bg ColorDefault, got %d", s.Bg())
+	}
+}
+
+func TestStyle_Background(t *testing.T) {
+	s := StyleDefault.Background(21)
+	if s.Bg() != 21 {
+		t.Errorf("expected bg 21, got %d", s.Bg())
+	}
+	if s.Fg() != ColorDefault {
+		t.Errorf("expected fg ColorDefault, got %d", s.Fg())
+	}
+}
+
+func TestStyle_Bold(t *testing.T) {
+	s := StyleDefault
+	if s.IsBold() {
+		t.Error("StyleDefault should not be bold")
+	}
+	b := s.Bold(true)
+	if !b.IsBold() {
+		t.Error("Bold(true) should be bold")
+	}
+	nb := b.Bold(false)
+	if nb.IsBold() {
+		t.Error("Bold(false) should not be bold")
+	}
+}
+
+func TestStyle_Combined(t *testing.T) {
+	s := StyleDefault.Foreground(82).Background(236).Bold(true).Reverse(true)
+	if s.Fg() != 82 {
+		t.Errorf("expected fg 82, got %d", s.Fg())
+	}
+	if s.Bg() != 236 {
+		t.Errorf("expected bg 236, got %d", s.Bg())
+	}
+	if !s.IsBold() {
+		t.Error("expected bold")
+	}
+	if !s.IsReverse() {
+		t.Error("expected reverse")
+	}
+}
+
+func TestStyle_DefaultValues(t *testing.T) {
+	s := StyleDefault
+	if s.Fg() != ColorDefault {
+		t.Errorf("expected fg ColorDefault, got %d", s.Fg())
+	}
+	if s.Bg() != ColorDefault {
+		t.Errorf("expected bg ColorDefault, got %d", s.Bg())
+	}
+	if s.IsBold() {
+		t.Error("StyleDefault should not be bold")
+	}
+	if s.IsReverse() {
+		t.Error("StyleDefault should not be reverse")
 	}
 }
 

@@ -112,3 +112,16 @@
   - Inactive window status lines use dashes with default (non-reverse) style; active uses spaces with reverse video
   - recalcWindows distributes `screenHeight - 1` rows (reserving 1 for message line) evenly, with remainder going to earlier windows
 ---
+
+## 2026-03-10 - US-008
+- Added C-x 2 handler in C-x prefix rune dispatch (case '2')
+- Creates a new Window with same buffer and scroll offset as active window
+- Inserts new window after active window in the windows slice using copy-based insertion
+- Calls recalcWindows to redistribute heights evenly
+- Active window remains the top half (activeWindowIdx unchanged)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Window splitting is simple: create new Window, insert into slice, recalcWindows handles all height distribution
+  - The `copy(windows[idx+1:], windows[idx:])` pattern inserts into a slice at a given position after `append(windows, nil)` grows it
+  - After split, both windows share the same *Buffer pointer — edits in one are visible in both (just scroll offset differs)
+---

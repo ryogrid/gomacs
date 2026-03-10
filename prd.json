@@ -144,7 +144,7 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Insert a new Window after the active window in the windows list, then recalculate all window heights by evenly distributing available screen rows."
     },
     {

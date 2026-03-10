@@ -302,6 +302,44 @@ func main() {
 					} else {
 						return
 					}
+				case term.KeyCtrlF:
+					minibufferMode = true
+					minibufferPrompt = "Find file: "
+					minibufferInput = nil
+					minibufferCallback = func(input string) {
+						if input == "" {
+							message = "No file name specified"
+							return
+						}
+						// Check if the file is already open in an existing buffer
+						for i, b := range buffers {
+							if b.Filename == input {
+								previousBufferIdx = activeBufferIdx
+								activeBufferIdx = i
+								buf = buffers[activeBufferIdx]
+								message = fmt.Sprintf("Switch to buffer: %s", input)
+								return
+							}
+						}
+						// Try to load the file from disk
+						newBuf, err := NewBufferFromFile(input)
+						if err != nil {
+							if os.IsNotExist(err) {
+								// File doesn't exist: create a new empty buffer with that filename
+								newBuf = NewBuffer()
+								newBuf.Filename = input
+								message = fmt.Sprintf("(New file) %s", input)
+							} else {
+								message = fmt.Sprintf("Error: %v", err)
+								return
+							}
+						}
+						buffers = append(buffers, newBuf)
+						previousBufferIdx = activeBufferIdx
+						activeBufferIdx = len(buffers) - 1
+						buf = buffers[activeBufferIdx]
+					}
+					message = minibufferPrompt
 				case term.KeyRune:
 					switch ev.Rune() {
 					case 'b':

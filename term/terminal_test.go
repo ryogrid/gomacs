@@ -21,13 +21,7 @@ func (t *Terminal) showForTest() {
 				t.out.WriteByte(';')
 				t.out.WriteString(strconv.Itoa(c + 1))
 				t.out.WriteByte('H')
-				if cur.style.IsReverse() {
-					t.out.WriteString("\033[7m")
-				}
-				t.out.WriteRune(cur.ch)
-				if cur.style.IsReverse() {
-					t.out.WriteString("\033[0m")
-				}
+				t.writeStyledCell(cur.ch, cur.style)
 				t.prev[r][c] = cur
 			}
 		}
@@ -376,6 +370,129 @@ func TestShow_ReverseStyle(t *testing.T) {
 	}
 	if !strings.Contains(output, "\033[0m") {
 		t.Errorf("expected reset \\033[0m in output")
+	}
+}
+
+func TestShow_ForegroundColor(t *testing.T) {
+	term := newTestTerminal(5, 3)
+	var buf bytes.Buffer
+	term.out = bufio.NewWriter(&buf)
+	for r := range term.prev {
+		for c := range term.prev[r] {
+			term.prev[r][c].ch = -1
+		}
+	}
+
+	term.SetContent(0, 0, 'G', StyleDefault.Foreground(82))
+	term.showForTest()
+
+	output := buf.String()
+	if !strings.Contains(output, "\033[38;5;82m") {
+		t.Errorf("expected foreground color \\033[38;5;82m in output, got %q", output)
+	}
+	if !strings.Contains(output, "\033[0m") {
+		t.Errorf("expected reset \\033[0m in output")
+	}
+}
+
+func TestShow_BackgroundColor(t *testing.T) {
+	term := newTestTerminal(5, 3)
+	var buf bytes.Buffer
+	term.out = bufio.NewWriter(&buf)
+	for r := range term.prev {
+		for c := range term.prev[r] {
+			term.prev[r][c].ch = -1
+		}
+	}
+
+	term.SetContent(0, 0, 'B', StyleDefault.Background(236))
+	term.showForTest()
+
+	output := buf.String()
+	if !strings.Contains(output, "\033[48;5;236m") {
+		t.Errorf("expected background color \\033[48;5;236m in output, got %q", output)
+	}
+	if !strings.Contains(output, "\033[0m") {
+		t.Errorf("expected reset \\033[0m in output")
+	}
+}
+
+func TestShow_BoldStyle(t *testing.T) {
+	term := newTestTerminal(5, 3)
+	var buf bytes.Buffer
+	term.out = bufio.NewWriter(&buf)
+	for r := range term.prev {
+		for c := range term.prev[r] {
+			term.prev[r][c].ch = -1
+		}
+	}
+
+	term.SetContent(0, 0, 'B', StyleDefault.Bold(true))
+	term.showForTest()
+
+	output := buf.String()
+	if !strings.Contains(output, "\033[1m") {
+		t.Errorf("expected bold \\033[1m in output, got %q", output)
+	}
+	if !strings.Contains(output, "\033[0m") {
+		t.Errorf("expected reset \\033[0m in output")
+	}
+}
+
+func TestShow_CombinedColorAndReverse(t *testing.T) {
+	term := newTestTerminal(5, 3)
+	var buf bytes.Buffer
+	term.out = bufio.NewWriter(&buf)
+	for r := range term.prev {
+		for c := range term.prev[r] {
+			term.prev[r][c].ch = -1
+		}
+	}
+
+	term.SetContent(0, 0, 'C', StyleDefault.Foreground(196).Background(21).Bold(true).Reverse(true))
+	term.showForTest()
+
+	output := buf.String()
+	// Should contain all attributes in a single sequence
+	if !strings.Contains(output, "1;38;5;196;48;5;21;7m") {
+		t.Errorf("expected combined style sequence in output, got %q", output)
+	}
+	if !strings.Contains(output, "\033[0m") {
+		t.Errorf("expected reset \\033[0m in output")
+	}
+}
+
+func TestShow_DefaultStyleNoEscapeSequences(t *testing.T) {
+	term := newTestTerminal(5, 3)
+	var buf bytes.Buffer
+	term.out = bufio.NewWriter(&buf)
+	// Mark prev dirty
+	for r := range term.prev {
+		for c := range term.prev[r] {
+			term.prev[r][c].ch = -1
+		}
+	}
+	// Clear cells to all default style spaces
+	term.Clear()
+	term.showForTest()
+
+	output := buf.String()
+	// Should not contain any style escape sequences (no [7m, [1m, [38;, [48;)
+	// Only cursor positioning \033[R;CH and cursor show \033[?25h
+	if strings.Contains(output, "\033[7m") {
+		t.Error("default style should not emit reverse video")
+	}
+	if strings.Contains(output, "\033[1m") {
+		t.Error("default style should not emit bold")
+	}
+	if strings.Contains(output, "38;5;") {
+		t.Error("default style should not emit foreground color")
+	}
+	if strings.Contains(output, "48;5;") {
+		t.Error("default style should not emit background color")
+	}
+	if strings.Contains(output, "\033[0m") {
+		t.Error("default style should not emit reset")
 	}
 }
 

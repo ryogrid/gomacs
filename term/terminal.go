@@ -237,6 +237,47 @@ func (t *Terminal) SetContent(x, y int, ch rune, style Style) {
 	}
 }
 
+// writeStyledCell writes ANSI escape sequences for a cell's style, the character,
+// and a reset sequence if any style attributes were applied.
+func (t *Terminal) writeStyledCell(ch rune, style Style) {
+	styled := style.IsBold() || style.Fg() != ColorDefault || style.Bg() != ColorDefault || style.IsReverse()
+	if styled {
+		t.out.WriteString("\033[")
+		first := true
+		if style.IsBold() {
+			t.out.WriteByte('1')
+			first = false
+		}
+		if style.Fg() != ColorDefault {
+			if !first {
+				t.out.WriteByte(';')
+			}
+			t.out.WriteString("38;5;")
+			t.out.WriteString(strconv.Itoa(int(style.Fg())))
+			first = false
+		}
+		if style.Bg() != ColorDefault {
+			if !first {
+				t.out.WriteByte(';')
+			}
+			t.out.WriteString("48;5;")
+			t.out.WriteString(strconv.Itoa(int(style.Bg())))
+			first = false
+		}
+		if style.IsReverse() {
+			if !first {
+				t.out.WriteByte(';')
+			}
+			t.out.WriteByte('7')
+		}
+		t.out.WriteByte('m')
+	}
+	t.out.WriteRune(ch)
+	if styled {
+		t.out.WriteString("\033[0m")
+	}
+}
+
 // Show diffs current buffer vs previous buffer and writes only changed cells.
 func (t *Terminal) Show() {
 	// Resize buffers if terminal size changed.
@@ -255,16 +296,7 @@ func (t *Terminal) Show() {
 				t.out.WriteByte(';')
 				t.out.WriteString(strconv.Itoa(c + 1))
 				t.out.WriteByte('H')
-				// Apply style.
-				if cur.style.IsReverse() {
-					t.out.WriteString("\033[7m")
-				}
-				// Write character.
-				t.out.WriteRune(cur.ch)
-				// Reset style if we applied reverse.
-				if cur.style.IsReverse() {
-					t.out.WriteString("\033[0m")
-				}
+				t.writeStyledCell(cur.ch, cur.style)
 				t.prev[r][c] = cur
 			}
 		}

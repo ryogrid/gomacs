@@ -1,6 +1,6 @@
 # Buffer Data Structure
 
-The `Buffer` struct in `buffer.go` is the core data model of goomacs. It manages text content, cursor state, selection, kill ring, undo history, and file I/O.
+The `Buffer` struct in `buffer.go` is the core data model of goomacs. It manages text content, cursor state, selection, kill ring, undo history, syntax highlighting state, and file I/O.
 
 ## Struct Overview
 
@@ -19,27 +19,19 @@ classDiagram
         +MarkC int
         +MarkActive bool
         +UndoStack []undoEntry
+        +Highlight *Highlighter
+        +HighlightDirty bool
         +NewBuffer() *Buffer
         +NewBufferFromFile(path) (*Buffer, error)
-        +MoveForward()
-        +MoveBackward()
-        +MoveUp()
-        +MoveDown()
-        +MoveBeginningOfLine()
-        +MoveEndOfLine()
-        +MoveBeginningOfBuffer()
-        +MoveEndOfBuffer()
         +InsertChar(ch rune)
         +InsertNewline()
         +Backspace()
         +DeleteChar()
         +KillLine()
         +Yank()
-        +ClearLastKill()
-        +SetMark()
-        +DeactivateMark()
         +KillRegion()
         +CopyRegion()
+        +SetMark()
         +InRegion(row, col) bool
         +SearchForward(query, startR, startC) (int, int, bool)
         +SearchBackward(query, startR, startC) (int, int, bool)
@@ -57,7 +49,13 @@ classDiagram
         +CursorC int
     }
 
+    class Highlighter {
+        +Highlight(lines [][]rune)
+        +StyleAt(row, col int) Style
+    }
+
     Buffer "1" *-- "*" undoEntry : UndoStack
+    Buffer "1" o-- "0..1" Highlighter : Highlight
 ```
 
 ## Line Storage Design
@@ -80,11 +78,11 @@ Lines[2] = []                           ← empty line
 - Slice operations are fast enough for the intended use case
 - Easier to reason about for undo snapshots
 
-## Cursor and Viewport
+## Cursor, Viewport, and Window
 
 ```
 ┌─────────────────────────────────┐
-│  (ScrollOffset = 5)             │  ← lines 0-4 not visible
+│  (Window.ScrollOffset = 5)      │  ← lines 0-4 not visible
 ├─────────────────────────────────┤
 │  Line 5: func main() {         │  ← first visible line
 │  Line 6:     buf := NewBuf()   │
@@ -92,14 +90,16 @@ Lines[2] = []                           ← empty line
 │  ...                           │
 │  Line 29: }                    │  ← last visible line
 ├─────────────────────────────────┤
-│  [filename] [Modified]  L8/100 │  ← status line (reverse video)
-│  Mark set                      │  ← message line
+│  main.go [Modified]  L8/100 C12│  ← status line (per window)
+└─────────────────────────────────┘
+│  Mark set                      │  ← message line (shared)
 └─────────────────────────────────┘
 ```
 
-- `CursorR` / `CursorC` -- absolute position within `Lines` (0-based)
-- `ScrollOffset` -- index of the first visible line
+- `CursorR` / `CursorC` -- absolute position within `Lines` (0-based), stored on the Buffer
+- Each `Window` has its own `ScrollOffset`, `StartRow`, and `Height`
 - `AdjustScroll(viewHeight)` ensures the cursor row stays within the visible viewport
+- When multiple windows share the same buffer, only the active window calls `AdjustScroll()` to prevent scroll bleeding
 
 ## Operations
 
@@ -126,9 +126,11 @@ Lines[2] = []                           ← empty line
 
 ### Editing
 
+All editing methods set `Modified = true` and `HighlightDirty = true`.
+
 | Method | Behavior |
 |--------|----------|
-| `InsertChar(ch)` | Inserts rune at cursor, advances cursor, sets `Modified` |
+| `InsertChar(ch)` | Inserts rune at cursor, advances cursor |
 | `InsertNewline()` | Splits current line at cursor, creates new line below |
 | `Backspace()` | Deletes char before cursor; at BOL, joins with previous line |
 | `DeleteChar()` | Deletes char at cursor; at EOL, joins with next line |
@@ -144,9 +146,9 @@ graph LR
 ```
 
 - `KillLine()` -- Kills from cursor to end of line. At EOL, joins with next line. Consecutive kills append to the same kill ring entry via the `lastKill` flag.
-- `KillRegion()` -- Kills the text between mark and point (cursor). Pushes to kill ring.
+- `KillRegion()` -- Kills the text between mark and point (cursor). Uses internal `deleteRegion()`.
 - `CopyRegion()` -- Copies region text to kill ring without deleting.
-- `Yank()` -- Inserts the last kill ring entry at the cursor position.
+- `Yank()` -- Inserts the last kill ring entry at the cursor position, handling embedded newlines.
 - `ClearLastKill()` -- Called by the event loop on non-kill keys to reset the consecutive-kill tracker.
 
 ### Mark and Region
@@ -155,10 +157,10 @@ The mark defines one end of a text selection; the cursor (point) defines the oth
 
 - `SetMark()` -- Sets mark at current cursor position, activates region.
 - `DeactivateMark()` -- Turns off the active region (mark position is preserved).
-- `InRegion(row, col)` -- Returns true if the given position falls within the active region. Used by the renderer to apply reverse video highlighting.
+- `InRegion(row, col)` -- Returns true if the given position falls within the active region. Used by the renderer to apply reverse video on top of syntax highlighting.
 - `regionBounds()` -- Internal helper that orders mark and point so start <= end.
 - `RegionText()` -- Returns the text between mark and point as `[]rune`.
-- `deleteRegion()` -- Internal method that removes the region text and repositions the cursor.
+- `deleteRegion()` -- Internal method that removes the region text, repositions cursor, and sets `HighlightDirty`.
 
 ### Search
 
@@ -178,6 +180,7 @@ graph TD
     subgraph "On C-_"
         C -->|pop| D[Undo]
         D -->|restore| E[Buffer state]
+        D -->|set| F[HighlightDirty = true]
     end
 
     style C fill:#f9f,stroke:#333
@@ -186,12 +189,33 @@ graph TD
 - **Snapshot-based** -- `SaveUndo()` deep-copies all `Lines` and the cursor position into an `undoEntry`.
 - **Bounded** -- Maximum 100 entries (`maxUndoEntries`). Oldest entries are discarded.
 - **Caller-driven** -- The event loop in `main.go` calls `SaveUndo()` before every editing operation.
-- `Undo()` pops the last entry and restores the buffer state. Returns `false` if the stack is empty.
+- `Undo()` pops the last entry, restores the buffer state, and sets `HighlightDirty = true`. Returns `false` if the stack is empty.
 
 ### File I/O
 
-- `NewBufferFromFile(path)` -- Reads a file, splits by newlines, initializes buffer with content and filename.
+- `NewBufferFromFile(path)` -- Reads a file, splits by newlines, initializes buffer with content, filename, and a `Highlighter` (via `NewHighlighter(filename)`). Sets `HighlightDirty = true`.
+- `NewBuffer()` -- Creates an empty buffer with one empty line. No highlighter attached (used for `*scratch*` and similar special buffers). Sets `HighlightDirty = true`.
 - `Save()` -- Writes buffer content to `Filename`. Uses atomic write (temp file + rename) for safety. Adds trailing newline. Returns `errNoFilename` if no filename is set.
+
+### Syntax Highlighting Integration
+
+Each buffer optionally holds a `*Highlighter` and a `HighlightDirty` flag:
+
+```mermaid
+flowchart TD
+    A[Buffer created or content edited] -->|set| B[HighlightDirty = true]
+    B --> C{Rendering?}
+    C -->|yes| D{HighlightDirty and Highlight != nil?}
+    D -->|yes| E["Highlight.Highlight(Lines)"]
+    E --> F[HighlightDirty = false]
+    F --> G["StyleAt(row, col) for each cell"]
+    D -->|no| G
+    C -->|no| H[Wait for next redraw]
+```
+
+- The `HighlightDirty` flag is set by: `NewBuffer()`, `NewBufferFromFile()`, `InsertChar()`, `InsertNewline()`, `Backspace()`, `DeleteChar()`, `KillLine()`, `deleteRegion()` (used by `KillRegion()`), and `Undo()`.
+- `Yank()` calls `InsertChar()`/`InsertNewline()` internally, so the flag is set transitively.
+- The rendering pipeline in `drawWindowContent()` checks the flag, re-highlights if needed, then uses `StyleAt()` per cell.
 
 ## Test Coverage
 

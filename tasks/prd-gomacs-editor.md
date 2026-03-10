@@ -1,8 +1,8 @@
-# PRD: Gomacs - Minimal Emacs-like CLI Editor
+# PRD: goomacs - Minimal Emacs-like CLI Editor
 
 ## Introduction
 
-Gomacs is a lightweight Emacs-like text editor for the terminal, written in pure Go. It provides a familiar Emacs keybinding experience for quick file edits without the complexity of a full Emacs installation. It uses `tcell` for terminal handling and supports single-file editing with essential Emacs keybindings including cursor movement, kill/yank, search, mark/region, and undo.
+goomacs is a lightweight Emacs-like text editor for the terminal, written in pure Go. It provides a familiar Emacs keybinding experience for quick file edits without the complexity of a full Emacs installation. It uses `tcell` for terminal handling and supports single-file editing with essential Emacs keybindings including cursor movement, kill/yank, search, mark/region, and undo.
 
 ## Goals
 
@@ -18,7 +18,7 @@ Gomacs is a lightweight Emacs-like text editor for the terminal, written in pure
 **Description:** As a developer, I need the Go project scaffolding and terminal initialization so that the editor can take over the terminal screen.
 
 **Acceptance Criteria:**
-- [ ] `go.mod` initialized with module name `gomacs`
+- [ ] `go.mod` initialized with module name `goomacs`
 - [ ] `tcell` added as dependency
 - [ ] Main function initializes a `tcell.Screen`, enters raw mode, and cleans up on exit
 - [ ] Running `go run .` shows a blank terminal screen and exits cleanly on `C-c`
@@ -42,8 +42,8 @@ Gomacs is a lightweight Emacs-like text editor for the terminal, written in pure
 **Description:** As a user, I want to open a file from the command line so that I can view its contents in the editor.
 
 **Acceptance Criteria:**
-- [ ] Running `gomacs filename.txt` opens and displays the file content
-- [ ] Running `gomacs` with no arguments opens an empty buffer
+- [ ] Running `goomacs filename.txt` opens and displays the file content
+- [ ] Running `goomacs` with no arguments opens an empty buffer
 - [ ] File content is rendered correctly in the terminal
 - [ ] Long lines are truncated at screen width (no wrapping for now)
 - [ ] Lines beyond the screen height are not displayed (scrolling comes later)

@@ -249,7 +249,7 @@ func (b *Buffer) Save() error {
 	sb.WriteByte('\n') // trailing newline
 
 	dir := filepath.Dir(b.Filename)
-	tmp, err := os.CreateTemp(dir, ".gomacs-save-*")
+	tmp, err := os.CreateTemp(dir, ".goomacs-save-*")
 	if err != nil {
 		return err
 	}

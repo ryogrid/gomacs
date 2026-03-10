@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The `C-SPC` (Ctrl+Space) keybinding for setting the mark in gomacs does not work on Windows Terminal under WSL2. The code correctly handles `tcell.KeyCtrlSpace`, but the terminal may not deliver the expected NUL byte (0x00) for Ctrl+Space, or tcell may not map it correctly in all environments. This fix ensures set-mark works reliably across terminals.
+The `C-SPC` (Ctrl+Space) keybinding for setting the mark in goomacs does not work on Windows Terminal under WSL2. The code correctly handles `tcell.KeyCtrlSpace`, but the terminal may not deliver the expected NUL byte (0x00) for Ctrl+Space, or tcell may not map it correctly in all environments. This fix ensures set-mark works reliably across terminals.
 
 ## Goals
 

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Replace the `github.com/gdamore/tcell/v2` dependency with a pure Go terminal I/O implementation using ANSI/VT100 escape sequences. This eliminates all external dependencies, making gomacs a zero-dependency Go binary. The implementation targets Linux/WSL2 POSIX terminals only and uses only the styling features currently needed (reverse video).
+Replace the `github.com/gdamore/tcell/v2` dependency with a pure Go terminal I/O implementation using ANSI/VT100 escape sequences. This eliminates all external dependencies, making goomacs a zero-dependency Go binary. The implementation targets Linux/WSL2 POSIX terminals only and uses only the styling features currently needed (reverse video).
 
 A parallel migration strategy is used: build the pure Go backend as a new package alongside tcell, validate it works, then switch `main.go` to use it and remove tcell.
 
@@ -11,7 +11,7 @@ A parallel migration strategy is used: build the pure Go backend as a new packag
 - Eliminate the `tcell` external dependency entirely (zero `require` lines in go.mod)
 - Implement terminal I/O using only Go standard library and ANSI/VT100 escape sequences
 - Maintain identical editor behavior and appearance after migration
-- Keep the implementation minimal -- only what gomacs currently uses
+- Keep the implementation minimal -- only what goomacs currently uses
 
 ## User Stories
 
@@ -79,7 +79,7 @@ A parallel migration strategy is used: build the pure Go backend as a new packag
 - [ ] `go build` succeeds
 
 ### US-006: Integrate Pure Go Backend into main.go
-**Description:** As a user, I want gomacs to use the pure Go terminal backend so that it has zero external dependencies.
+**Description:** As a user, I want goomacs to use the pure Go terminal backend so that it has zero external dependencies.
 
 **Acceptance Criteria:**
 - [ ] Update `main.go` to import and use the new `term` package instead of `tcell`

@@ -1,8 +1,8 @@
-# Gomacs
+# goomacs
 
 A lightweight, fast-starting Emacs-like terminal text editor written in pure Go.
 
-Gomacs provides a familiar Emacs keybinding experience for quick file editing without the overhead of a full Emacs installation. It is designed to be minimal, portable, and easy to use.
+goomacs provides a familiar Emacs keybinding experience for quick file editing without the overhead of a full Emacs installation. It is designed to be minimal, portable, and easy to use.
 
 <img width="887" height="715" alt="image" src="https://github.com/user-attachments/assets/fa801524-46ab-4a04-806d-6a5437bcbfb7" />
 
@@ -21,14 +21,14 @@ Gomacs provides a familiar Emacs keybinding experience for quick file editing wi
 Requires Go 1.24 or later.
 
 ```bash
-go build -o gomacs .
+go build -o goomacs .
 ```
 
 ## Usage
 
 ```bash
-./gomacs                # Open with an empty buffer
-./gomacs filename.txt   # Open an existing file
+./goomacs                # Open with an empty buffer
+./goomacs filename.txt   # Open an existing file
 ```
 
 ## Keybindings
@@ -85,7 +85,7 @@ The status bar at the bottom of the screen shows:
 ## Project Structure
 
 ```
-gomacs/
+goomacs/
 ├── main.go              # Event loop, keybinding dispatch, and UI rendering
 ├── buffer.go            # Buffer data structure and editing operations
 ├── buffer_test.go       # Buffer unit tests (69 tests)
@@ -104,7 +104,7 @@ gomacs/
 
 ## Dependencies
 
-No external dependencies. Gomacs uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) for terminal handling via ANSI/VT100 escape sequences.
+No external dependencies. goomacs uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) for terminal handling via ANSI/VT100 escape sequences.
 
 ## Testing
 

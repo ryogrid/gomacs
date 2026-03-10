@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Gomacs is a lightweight, Emacs-like terminal text editor written in pure Go with zero external dependencies. The architecture follows a clean three-layer design separating data management, terminal I/O, and UI logic.
+goomacs is a lightweight, Emacs-like terminal text editor written in pure Go with zero external dependencies. The architecture follows a clean three-layer design separating data management, terminal I/O, and UI logic.
 
 ## Layer Diagram
 
@@ -46,7 +46,7 @@ graph TB
 ## Module Structure
 
 ```
-gomacs/                     (module: gomacs)
+goomacs/                     (module: goomacs)
 ├── main.go                 UI layer: event loop, rendering, keybinding dispatch
 ├── buffer.go               Data layer: Buffer struct, text operations
 ├── buffer_test.go          Buffer unit tests (69 tests)

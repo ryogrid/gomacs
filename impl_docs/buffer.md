@@ -1,6 +1,6 @@
 # Buffer Data Structure
 
-The `Buffer` struct in `buffer.go` is the core data model of gomacs. It manages text content, cursor state, selection, kill ring, undo history, and file I/O.
+The `Buffer` struct in `buffer.go` is the core data model of goomacs. It manages text content, cursor state, selection, kill ring, undo history, and file I/O.
 
 ## Struct Overview
 

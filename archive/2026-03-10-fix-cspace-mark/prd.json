@@ -1,5 +1,5 @@
 {
-  "project": "Gomacs",
+  "project": "goomacs",
   "branchName": "ralph/fix-cspace-mark",
   "description": "Fix C-SPC (Ctrl+Space) set-mark not working on Windows Terminal / WSL2",
   "userStories": [
@@ -9,7 +9,7 @@
       "description": "As a developer, I need to understand what key event the terminal actually sends for Ctrl+Space so I can handle it correctly.",
       "acceptanceCriteria": [
         "Add temporary debug logging to capture ev.Key() and ev.Modifiers() values for all keypresses",
-        "Run gomacs in Windows Terminal on WSL2 and press Ctrl+Space",
+        "Run goomacs in Windows Terminal on WSL2 and press Ctrl+Space",
         "Document what key code and modifiers are received (e.g., KeyCtrlSpace, KeyNUL, KeyRune with rune 0, etc.)",
         "Remove debug logging after diagnosis",
         "Typecheck passes"

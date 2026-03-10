@@ -1,5 +1,5 @@
 {
-  "project": "Gomacs",
+  "project": "goomacs",
   "branchName": "ralph/pure-go-terminal",
   "description": "Pure Go Terminal Backend - Eliminate tcell dependency by implementing terminal I/O with ANSI/VT100 escape sequences",
   "userStories": [
@@ -20,7 +20,7 @@
       ],
       "priority": 1,
       "passes": true,
-      "notes": "This story defines types only -- no implementation yet. Keep the interface minimal, matching only what gomacs currently uses from tcell."
+      "notes": "This story defines types only -- no implementation yet. Keep the interface minimal, matching only what goomacs currently uses from tcell."
     },
     {
       "id": "US-002",
@@ -115,9 +115,9 @@
     {
       "id": "US-007",
       "title": "Integrate Pure Go Backend into main.go",
-      "description": "As a user, I want gomacs to use the pure Go terminal backend so that it has zero external dependencies.",
+      "description": "As a user, I want goomacs to use the pure Go terminal backend so that it has zero external dependencies.",
       "acceptanceCriteria": [
-        "Update main.go to import gomacs/term instead of github.com/gdamore/tcell/v2",
+        "Update main.go to import goomacs/term instead of github.com/gdamore/tcell/v2",
         "Replace all tcell.Key* constants with term.Key* equivalents",
         "Replace all tcell.Style* usage with term.Style* equivalents",
         "Replace tcell.EventKey / tcell.EventResize with term.KeyEvent / term.ResizeEvent",

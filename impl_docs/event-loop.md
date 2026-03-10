@@ -1,6 +1,6 @@
 # Event Loop and UI Rendering
 
-The event loop in `main.go` is the central coordinator of gomacs. It polls terminal events, dispatches them to buffer operations, and triggers screen rendering.
+The event loop in `main.go` is the central coordinator of goomacs. It polls terminal events, dispatches them to buffer operations, and triggers screen rendering.
 
 ## Event Loop State Machine
 

@@ -1,15 +1,15 @@
 # Ralph Progress Log
 Started: Mon Mar  9 23:11:47 JST 2026
 ## Codebase Patterns
-- Module name is `gomacs`, use `go vet ./...` for typechecking
-- Binary name is `gomacs`, excluded in .gitignore
+- Module name is `goomacs`, use `go vet ./...` for typechecking
+- Binary name is `goomacs`, excluded in .gitignore
 - tcell v2 is used for terminal handling (github.com/gdamore/tcell/v2)
 - Buffer struct in buffer.go holds text as [][]rune with CursorR/CursorC and Modified flag
 - Run tests with `go test ./... -v`
 ---
 
 ## 2026-03-09 - US-001
-- Initialized go.mod with module `gomacs`
+- Initialized go.mod with module `goomacs`
 - Added tcell/v2 dependency
 - Created main.go with tcell.Screen init, raw mode, cleanup on exit, C-c to quit
 - Added .gitignore for binary

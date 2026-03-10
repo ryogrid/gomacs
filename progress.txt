@@ -1,5 +1,5 @@
 ## Codebase Patterns
-- Module name is `gomacs`, so term package imports as `gomacs/term`
+- Module name is `goomacs`, so term package imports as `goomacs/term`
 - main.go uses tcell types: Screen, EventKey, EventResize, StyleDefault, Key* constants, ModAlt
 - SetContent in tcell takes (x, y, ch, combining []rune, style) - our term.Screen drops combining runes param
 - tcell uses pointer receivers for events (*tcell.EventKey) - our term package matches this pattern
@@ -13,7 +13,7 @@
 - Defined Screen interface, Event interface, KeyEvent, ResizeEvent, Style, KeyCode constants, ModMask constants in term/screen.go
 - Files changed: term/screen.go (new)
 - **Learnings for future iterations:**
-  - The interface is minimal, matching only what gomacs currently uses from tcell
+  - The interface is minimal, matching only what goomacs currently uses from tcell
   - Style uses a bitmask approach (uint8) for extensibility
   - Events use a marker method pattern (isEvent()) for the interface
   - KeyCode constants start at 256 to leave room for rune values
@@ -105,7 +105,7 @@
 
 ## 2026-03-10 - US-007
 - Integrated pure Go terminal backend into main.go, replacing tcell dependency
-- Replaced `github.com/gdamore/tcell/v2` import with `gomacs/term`
+- Replaced `github.com/gdamore/tcell/v2` import with `goomacs/term`
 - Replaced all tcell type references: `*tcell.EventKey` → `*term.KeyEvent`, `*tcell.EventResize` → `*term.ResizeEvent`, `tcell.Screen` → `term.Screen`
 - Replaced `tcell.NewScreen()` with `term.NewTerminal()` (no error return from constructor)
 - Replaced all tcell.Key* constants with term.Key* equivalents
@@ -118,5 +118,5 @@
   - The migration was mostly mechanical find-and-replace of tcell → term types/constants
   - Key API difference: term.SetContent drops the `combining []rune` parameter that tcell has
   - term.NewTerminal() returns *Terminal directly (no error), Init() is where errors happen
-  - All existing buffer tests (gomacs package) and term tests pass after migration
+  - All existing buffer tests (goomacs package) and term tests pass after migration
 ---

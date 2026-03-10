@@ -1,14 +1,14 @@
 {
-  "project": "Gomacs",
-  "branchName": "ralph/gomacs-editor",
-  "description": "Gomacs - Minimal Emacs-like CLI editor written in pure Go with tcell for terminal handling",
+  "project": "goomacs",
+  "branchName": "ralph/goomacs-editor",
+  "description": "goomacs - Minimal Emacs-like CLI editor written in pure Go with tcell for terminal handling",
   "userStories": [
     {
       "id": "US-001",
       "title": "Project Setup and Terminal Initialization",
       "description": "As a developer, I need the Go project scaffolding and terminal initialization so that the editor can take over the terminal screen.",
       "acceptanceCriteria": [
-        "go.mod initialized with module name gomacs",
+        "go.mod initialized with module name goomacs",
         "tcell added as dependency (github.com/gdamore/tcell/v2)",
         "Main function initializes a tcell.Screen, enters raw mode, and cleans up on exit",
         "Running go run . shows a blank terminal screen and exits cleanly on C-c",
@@ -42,8 +42,8 @@
       "title": "File Open and Display",
       "description": "As a user, I want to open a file from the command line so that I can view its contents in the editor.",
       "acceptanceCriteria": [
-        "Running gomacs filename.txt opens and displays the file content",
-        "Running gomacs with no arguments opens an empty buffer",
+        "Running goomacs filename.txt opens and displays the file content",
+        "Running goomacs with no arguments opens an empty buffer",
         "File content is rendered correctly in the terminal",
         "Long lines are truncated at screen width (no wrapping)",
         "Lines beyond the screen height are not displayed (scrolling comes later)",

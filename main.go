@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"gomacs/term"
+	"goomacs/term"
 )
 
 const tabWidth = 8

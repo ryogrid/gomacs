@@ -920,6 +920,34 @@ func main() {
 		case *term.ResizeEvent:
 			screen.Sync()
 			screenWidth, screenHeight = screen.Size()
+			// In horizontal mode, close excess rightmost windows if terminal is too narrow.
+			if splitMode == "horizontal" && len(windows) > 1 {
+				for len(windows) > 1 {
+					n := len(windows)
+					available := screenWidth - (n - 1) // subtract separator columns
+					if available/n >= 10 {
+						break
+					}
+					// Close the rightmost window
+					windows = windows[:n-1]
+					if activeWindowIdx >= len(windows) {
+						activeWindowIdx = len(windows) - 1
+					}
+					message = "Window too narrow; closed rightmost window"
+				}
+				if len(windows) == 1 {
+					splitMode = "vertical"
+				}
+				activeWin := windows[activeWindowIdx]
+				buf = activeWin.Buffer
+				for i, b := range buffers {
+					if b == activeWin.Buffer {
+						previousBufferIdx = activeBufferIdx
+						activeBufferIdx = i
+						break
+					}
+				}
+			}
 			recalcWindows(windows, screenWidth, screenHeight)
 			redraw()
 		}

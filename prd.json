@@ -127,7 +127,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "This is a significant refactor of the rendering pipeline. Move ScrollOffset from Buffer to Window. The AdjustScroll logic must use the window's height (minus 1 for status line). Each window's viewHeight = window.height - 1. drawBuffer/drawBufferWithSearch must accept a row offset and height parameter."
     },
     {

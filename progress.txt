@@ -13,6 +13,10 @@
 - C-x prefix plain-char keys: use `case term.KeyRune:` with nested `switch ev.Rune()` for b, k, 0, 1, 2, o
 - Confirm mode (y/n prompts): set `confirmMode=true`, `confirmCallback=func(bool){...}`, set `message` to prompt; handled before kill tracking reset in dispatch order
 - After switching `activeBufferIdx`, always reassign `buf = buffers[activeBufferIdx]` and update `previousBufferIdx`
+- After switching active buffer, also update `activeWin.Buffer = buf` and `activeWin.ScrollOffset = 0`
+- Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
+- `windows []*Window` and `activeWindowIdx` track window layout; `recalcWindows(windows, screenHeight)` redistributes heights
+- Rendering: drawWindowContent(screen, win, sh) draws buffer in window's row range; drawWindowStatusLine(screen, win, active) draws status
 
 ## Progress: Multi-Buffer & Window Splitting
 
@@ -86,4 +90,25 @@
   - Confirm mode is a new sub-mode at priority: searchMode → minibufferMode → confirmMode → C-x prefix → normal
   - When removing an element from `buffers` slice by index, must adjust both `activeBufferIdx` and `previousBufferIdx` (decrement if they were after the removed index, clamp if at end)
   - The `killBuffer` closure inside the minibuffer callback captures `targetIdx` — this works because the confirm callback runs synchronously within the same event loop iteration
+---
+
+## 2026-03-10 - US-007
+- Added Window struct with fields: Buffer (*Buffer), ScrollOffset (int), StartRow (int), Height (int)
+- Added Window methods: ViewHeight(), AdjustScroll(), ScrollDown(), ScrollUp()
+- Added recalcWindows() to distribute screen rows evenly among windows
+- Refactored rendering: drawBuffer/drawBufferWithSearch → drawWindowContent, drawStatusLine → drawWindowStatusLine
+- drawWindowContent renders buffer content within window's row range (StartRow to StartRow+ViewHeight-1)
+- drawWindowStatusLine renders status at StartRow+Height-1; active=reverse video, inactive=dashes with default style
+- main() now holds windows []*Window and activeWindowIdx; initially one window occupying full screen minus message line
+- redraw() loops over all windows, adjusting scroll and drawing each; cursor shown only in active window
+- ScrollOffset moved from Buffer to Window; C-v and M-v use activeWin.ScrollDown()/ScrollUp()
+- Terminal resize calls recalcWindows() to redistribute window heights
+- When switching buffers (C-x b, C-x C-f, C-x C-b, C-x k), also update activeWin.Buffer and reset activeWin.ScrollOffset
+- Removed textAreaHeight() function (replaced by Window.ViewHeight())
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - When switching the active buffer, must also update `activeWin.Buffer = buf` and `activeWin.ScrollOffset = 0` to keep window in sync
+  - `activeWin := windows[activeWindowIdx]` is captured at the start of each key event; closures (minibuffer callbacks) capture it by reference so it stays valid
+  - Inactive window status lines use dashes with default (non-reverse) style; active uses spaces with reverse video
+  - recalcWindows distributes `screenHeight - 1` rows (reserving 1 for message line) evenly, with remainder going to earlier windows
 ---

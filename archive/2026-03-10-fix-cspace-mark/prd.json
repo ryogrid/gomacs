@@ -1,0 +1,39 @@
+{
+  "project": "Gomacs",
+  "branchName": "ralph/fix-cspace-mark",
+  "description": "Fix C-SPC (Ctrl+Space) set-mark not working on Windows Terminal / WSL2",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Diagnose C-SPC Key Event",
+      "description": "As a developer, I need to understand what key event the terminal actually sends for Ctrl+Space so I can handle it correctly.",
+      "acceptanceCriteria": [
+        "Add temporary debug logging to capture ev.Key() and ev.Modifiers() values for all keypresses",
+        "Run gomacs in Windows Terminal on WSL2 and press Ctrl+Space",
+        "Document what key code and modifiers are received (e.g., KeyCtrlSpace, KeyNUL, KeyRune with rune 0, etc.)",
+        "Remove debug logging after diagnosis",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "tcell.KeyCtrlSpace is value 64, tcell.KeyNUL is value 0 — they are different constants. The terminal may send NUL (0x00) which could map to either, or may not send anything at all."
+    },
+    {
+      "id": "US-002",
+      "title": "Fix Set-Mark Keybinding for Cross-Terminal Compatibility",
+      "description": "As a user, I want to press C-SPC to set the mark so that I can select text regions in any terminal.",
+      "acceptanceCriteria": [
+        "Pressing Ctrl+Space in Windows Terminal on WSL2 sets the mark and shows 'Mark set' in the message bar",
+        "Mark position matches current cursor position",
+        "Region highlighting works when moving cursor after setting mark",
+        "C-w (kill region) and M-w (copy region) work after setting mark with C-SPC",
+        "C-SPC still works on terminals where it previously worked (no regression)",
+        "All existing tests pass (go test ./...)",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Based on US-001 findings, add handling for the actual key code sent by Windows Terminal. Likely need to handle KeyNUL (value 0) or KeyRune with rune 0 as additional cases alongside KeyCtrlSpace in main.go switch statement."
+    }
+  ]
+}

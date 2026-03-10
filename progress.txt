@@ -16,6 +16,18 @@
 
 ## Progress: Horizontal Window Split
 
+## 2026-03-10 - US-004
+- What was implemented: Updated drawWindowContent and drawWindowStatusLine to respect window's StartCol and Width
+- drawWindowContent: uses win.Width instead of screen width for boundary checks, adds win.StartCol offset to all SetContent calls
+- drawWindowStatusLine: constrains fill, left text, and right text to win.StartCol..StartCol+Width range
+- In vertical mode (StartCol=0, Width=screenWidth), behavior is identical to before
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Pattern: replace `width, _ := screen.Size()` with `winWidth := win.Width` in rendering functions
+  - All SetContent calls must use `win.StartCol + col` for the x coordinate
+  - Status line right-alignment calculation uses winWidth, then adds win.StartCol when drawing
+---
+
 ## 2026-03-10 - US-003
 - What was implemented: Updated recalcWindows to handle horizontal (side-by-side) layout
 - In horizontal mode: available width = screenWidth - (n-1) separators, distributed evenly with remainder to first windows

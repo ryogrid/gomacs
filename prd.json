@@ -72,7 +72,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "The main change is in drawWindowContent: all SetContent calls must add StartCol offset to the column. Line rendering must stop at StartCol+Width. drawWindowStatusLine must also be bounded to the window's column range. In vertical mode, StartCol=0 and Width=screenWidth, so existing behavior is preserved."
     },
     {

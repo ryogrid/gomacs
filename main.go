@@ -167,7 +167,9 @@ func main() {
 		screen.Clear()
 		activeWin := windows[activeWindowIdx]
 		for i, win := range windows {
-			win.AdjustScroll()
+			if i == activeWindowIdx {
+				win.AdjustScroll()
+			}
 			isActive := i == activeWindowIdx
 			if isActive && searchMode && searchHasMatch {
 				drawWindowContent(screen, win, searchHighlight{

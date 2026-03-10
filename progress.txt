@@ -3,11 +3,10 @@
 - main.go uses term.Screen interface with term.KeyEvent, term.ResizeEvent, term.Style types
 - Buffer struct holds Lines, CursorR/C, ScrollOffset, Modified, Filename, KillRing, Mark, UndoStack
 - Event loop in main.go: PollEvent → dispatch by mode (search/C-x prefix/normal) → redraw
-- Style is currently uint8 with only reverse video support (styleReverse bitmask)
 - cell struct in terminal.go: {ch rune, style Style} — used for diff-based rendering in Show()
-- Show() in terminal.go diffs cells vs prev, emits ANSI cursor positioning + reverse video sequences
-- showForTest() in terminal_test.go duplicates Show() rendering logic — keep them in sync
+- showForTest() in terminal_test.go uses writeStyledCell() helper — Show() and showForTest() share rendering logic
 - Style is now a struct (fg Color, bg Color, reverse bool, bold bool); StyleDefault is a var, not const
+- writeStyledCell() on Terminal emits combined ANSI sequence: bold, fg 256-color, bg 256-color, reverse in one \033[...m block, then resets with \033[0m
 - drawWindowContent(screen, win, sh) renders buffer content in window's row range
 - Tab expansion handled in rendering (bufColToVisualCol)
 - `buf` is a local alias for `buffers[activeBufferIdx]`
@@ -26,5 +25,17 @@
   - StyleDefault changed from const to var — all existing call sites (main.go, tests) work without changes
   - showForTest() in terminal_test.go duplicates Show() rendering logic — when updating Show() rendering (US-002), must also update showForTest()
   - Test format strings using %d for Style need to change to %v since it's now a struct
+---
+
+## 2026-03-10 - US-002
+- Updated Show() and showForTest() to emit 256-color ANSI sequences for fg, bg, bold, and reverse
+- Extracted writeStyledCell() helper method on Terminal to share rendering logic between Show() and showForTest()
+- ANSI attributes emitted in a single combined \033[...m sequence (bold;fg;bg;reverse), followed by \033[0m reset
+- Default-styled cells emit no escape sequences beyond cursor positioning
+- Files changed: term/terminal.go, term/terminal_test.go
+- **Learnings for future iterations:**
+  - writeStyledCell() is the single source of truth for style→ANSI conversion — update it for any new style attributes
+  - showForTest() now calls writeStyledCell() instead of duplicating logic — no more sync issues
+  - Tests verify individual attributes (fg, bg, bold, reverse) and combined attributes in one sequence
 ---
 

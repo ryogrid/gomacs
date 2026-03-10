@@ -40,7 +40,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Build the ANSI sequence as: reset first if needed, then set all attributes (bold, fg, bg, reverse) in one batch before the character, and reset after. This minimizes escape sequence overhead."
     },
     {

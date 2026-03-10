@@ -16,7 +16,7 @@ goomacs provides a familiar Emacs keybinding experience for quick file editing w
 - **Undo** -- Up to 100 levels of undo history (C-_ / C-/)
 - **Tab support** -- Displays tabs with 8-column tab stops
 - **Multiple buffers** -- Open and switch between multiple files (C-x b, C-x C-f, C-x C-b)
-- **Window splitting** -- Split the screen vertically to view multiple buffers at once (C-x 2, C-x o)
+- **Window splitting** -- Split the screen vertically (C-x 2) or horizontally side-by-side (C-x 3) to view multiple buffers at once
 - **Syntax highlighting** -- Automatic syntax coloring for source code files using Chroma (monokai theme, 256-color)
 - **Minimal dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences
 
@@ -89,6 +89,7 @@ go build -o goomacs .
 | Key | Action |
 |-----|--------|
 | C-x 2 | Split window vertically (top/bottom) |
+| C-x 3 | Split window horizontally (side-by-side) |
 | C-x o | Move focus to next window |
 | C-x 0 | Close current window |
 | C-x 1 | Close all other windows |

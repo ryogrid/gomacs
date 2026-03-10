@@ -65,3 +65,19 @@
   - deleteRegion() is the shared implementation for KillRegion — setting the flag there covers KillRegion without needing to set it in KillRegion() itself
 ---
 
+## 2026-03-10 - US-005
+- Added Highlight *Highlighter field to Buffer struct
+- NewBufferFromFile() creates and attaches Highlighter via NewHighlighter(filename)
+- C-x C-f (find-file) also attaches Highlighter for new files
+- drawWindowContent() checks HighlightDirty, re-highlights if needed, uses StyleAt() for base style
+- Region/search reverse video applied on top of syntax highlighting styles
+- Special buffers (*scratch*, *Buffer List*) have nil Highlighter — render normally
+- Updated README.md: "Zero dependencies" → "Minimal dependencies", added syntax highlighting to features
+- Files changed: buffer.go, main.go, README.md
+- **Learnings for future iterations:**
+  - Highlighter integration is minimal: add field to Buffer, call Highlight() in drawWindowContent, use StyleAt() for base style
+  - HighlightDirty flag prevents re-tokenizing on every redraw — set false after Highlight() call
+  - Reverse video for region/search is applied on top of syntax style via style.Reverse(true), preserving colors
+  - NewBuffer() for special buffers (*scratch*) doesn't need a Highlighter — nil is handled gracefully
+---
+

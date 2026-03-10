@@ -96,7 +96,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "The key rendering logic change is in drawWindowContent(): instead of always using term.StyleDefault as the base style, use highlighter.StyleAt(row, col) when available. Region/search reverse video is applied on top via style.Reverse(true). The HighlightDirty flag from US-004 prevents re-tokenizing on every redraw."
     }
   ]

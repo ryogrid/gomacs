@@ -109,7 +109,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "For input parsing tests, inject a bytes.Reader or io.Reader instead of os.Stdin. For screen rendering tests, capture output to a bytes.Buffer."
     },
     {

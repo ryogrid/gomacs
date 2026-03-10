@@ -90,3 +90,15 @@
   - Control char mapping: 0x01=C-a, 0x09=Tab, 0x0d=Enter, 0x1f=C-_, 0x7f=Backspace2
   - The `in` field defaults to os.Stdin but can be set to bytes.Reader for testing
 ---
+
+## 2026-03-10 - US-006
+- Implemented comprehensive test suite in term/terminal_test.go (16 tests)
+- Tests cover: control char parsing, special keys (NUL, Tab, Enter, C-_, Backspace), ANSI arrow key sequences, UTF-8 multi-byte runes, Alt+key modifier, Alt+control char, SetContent/Clear, screen diff rendering, reverse video style, Style.Reverse(), PostEvent priority, Sync dirty marking, integration tests with injected reader
+- Files changed: term/terminal_test.go (new)
+- **Learnings for future iterations:**
+  - showForTest() method added to Terminal in test file to avoid Size() syscall during rendering tests
+  - newTestTerminal() helper creates Terminal with channels and buffers without Init() syscall
+  - parseInput() can be called directly for unit testing input parsing (no goroutine needed)
+  - drainEvents() helper reads all buffered events for assertion
+  - readInput() works with bytes.Reader for integration-style tests (returns on EOF)
+---

@@ -41,6 +41,7 @@ func main() {
 		buffers = append(buffers, scratch)
 	}
 	activeBufferIdx := 0
+	previousBufferIdx := 0
 	buf := buffers[activeBufferIdx]
 
 	screen := term.NewTerminal()
@@ -300,6 +301,38 @@ func main() {
 						quitWarned = true
 					} else {
 						return
+					}
+				case term.KeyRune:
+					switch ev.Rune() {
+					case 'b':
+						minibufferMode = true
+						minibufferPrompt = "Switch to buffer: "
+						minibufferInput = nil
+						minibufferCallback = func(input string) {
+							if input == "" {
+								// Switch to previous buffer
+								previousBufferIdx, activeBufferIdx = activeBufferIdx, previousBufferIdx
+								buf = buffers[activeBufferIdx]
+								return
+							}
+							// Search for existing buffer by name
+							for i, b := range buffers {
+								if b.Filename == input {
+									previousBufferIdx = activeBufferIdx
+									activeBufferIdx = i
+									buf = buffers[activeBufferIdx]
+									return
+								}
+							}
+							// Create new empty buffer with that name
+							newBuf := NewBuffer()
+							newBuf.Filename = input
+							buffers = append(buffers, newBuf)
+							previousBufferIdx = activeBufferIdx
+							activeBufferIdx = len(buffers) - 1
+							buf = buffers[activeBufferIdx]
+						}
+						message = minibufferPrompt
 					}
 				}
 				redraw()

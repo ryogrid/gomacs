@@ -76,6 +76,9 @@ func main() {
 	var minibufferInput []rune           // current input text
 	var minibufferCallback func(string)  // called with input on Enter
 
+	var confirmMode bool           // true when waiting for y/n confirmation
+	var confirmCallback func(bool) // called with true for y, false for n
+
 	redraw := func() {
 		buf.AdjustScroll(viewHeight)
 		if searchMode && searchHasMatch {
@@ -265,6 +268,31 @@ func main() {
 				continue
 			}
 
+			// Handle y/n confirmation mode
+			if confirmMode {
+				if ev.Key() == term.KeyRune {
+					switch ev.Rune() {
+					case 'y':
+						confirmMode = false
+						cb := confirmCallback
+						confirmCallback = nil
+						if cb != nil {
+							cb(true)
+						}
+					case 'n':
+						confirmMode = false
+						confirmCallback = nil
+						message = "Cancelled"
+					}
+				} else if ev.Key() == term.KeyCtrlG {
+					confirmMode = false
+					confirmCallback = nil
+					message = "Quit"
+				}
+				redraw()
+				continue
+			}
+
 			// Reset consecutive kill tracking for non-kill keys
 			if ev.Key() != term.KeyCtrlK {
 				buf.ClearLastKill()
@@ -428,6 +456,86 @@ func main() {
 							previousBufferIdx = activeBufferIdx
 							activeBufferIdx = len(buffers) - 1
 							buf = buffers[activeBufferIdx]
+						}
+						message = minibufferPrompt
+					case 'k':
+						currentName := buf.Filename
+						if currentName == "" {
+							currentName = "[No Name]"
+						}
+						minibufferMode = true
+						minibufferPrompt = fmt.Sprintf("Kill buffer: (default %s) ", currentName)
+						minibufferInput = nil
+						minibufferCallback = func(input string) {
+							// Find target buffer
+							targetIdx := activeBufferIdx
+							if input != "" {
+								targetIdx = -1
+								for i, b := range buffers {
+									if b.Filename == input {
+										targetIdx = i
+										break
+									}
+								}
+								if targetIdx == -1 {
+									message = fmt.Sprintf("No buffer named %s", input)
+									return
+								}
+							}
+							
+							killBuffer := func() {
+								killedName := buffers[targetIdx].Filename
+								// Remove buffer from list
+								buffers = append(buffers[:targetIdx], buffers[targetIdx+1:]...)
+								
+								// If no buffers left, create *scratch*
+								if len(buffers) == 0 {
+									scratch := NewBuffer()
+									scratch.Filename = "*scratch*"
+									buffers = append(buffers, scratch)
+									activeBufferIdx = 0
+									previousBufferIdx = 0
+									buf = buffers[0]
+									message = fmt.Sprintf("Killed buffer %s", killedName)
+									return
+								}
+								
+								// Adjust activeBufferIdx
+								if targetIdx == activeBufferIdx {
+									if activeBufferIdx >= len(buffers) {
+										activeBufferIdx = len(buffers) - 1
+									}
+								} else if targetIdx < activeBufferIdx {
+									activeBufferIdx--
+								}
+								
+								// Adjust previousBufferIdx
+								if previousBufferIdx == targetIdx {
+									previousBufferIdx = activeBufferIdx
+								} else if previousBufferIdx > targetIdx {
+									previousBufferIdx--
+								}
+								if previousBufferIdx >= len(buffers) {
+									previousBufferIdx = len(buffers) - 1
+								}
+								
+								buf = buffers[activeBufferIdx]
+								message = fmt.Sprintf("Killed buffer %s", killedName)
+							}
+							
+							// Check if buffer is modified
+							if buffers[targetIdx].Modified {
+								message = "Buffer modified; kill anyway? (y/n)"
+								confirmMode = true
+								confirmCallback = func(yes bool) {
+									if yes {
+										killBuffer()
+									}
+								}
+								return
+							}
+							
+							killBuffer()
 						}
 						message = minibufferPrompt
 					}

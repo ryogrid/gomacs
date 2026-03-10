@@ -1,0 +1,137 @@
+{
+  "project": "goomacs",
+  "branchName": "ralph/pure-go-terminal",
+  "description": "Pure Go Terminal Backend - Eliminate tcell dependency by implementing terminal I/O with ANSI/VT100 escape sequences",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Define Terminal Abstraction Interface",
+      "description": "As a developer, I need a clean Screen interface and supporting types so that main.go can be migrated from tcell to the new pure Go backend.",
+      "acceptanceCriteria": [
+        "Create term/ subdirectory with screen.go defining Screen interface: Init() error, Fini(), Size() (int, int), PollEvent() Event, PostEvent(Event), Clear(), SetContent(x, y int, ch rune, style Style), Show(), ShowCursor(x, y int), Sync()",
+        "Define Event interface with a marker method",
+        "Define KeyEvent struct with Key() KeyCode, Rune() rune, Modifiers() ModMask methods",
+        "Define ResizeEvent struct with Size() (int, int) method",
+        "Define Style type with Reverse(bool) Style method and a StyleDefault zero value",
+        "Define key code constants for all keys used in main.go: KeyNUL, KeyCtrlA through KeyCtrlZ, KeyCtrlSpace, KeyCtrlUnderscore, KeyEnter, KeyBackspace, KeyBackspace2, KeyEsc, KeyUp, KeyDown, KeyLeft, KeyRight, KeyRune",
+        "Define ModNone and ModAlt modifier constants",
+        "go build ./term/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "This story defines types only -- no implementation yet. Keep the interface minimal, matching only what goomacs currently uses from tcell."
+    },
+    {
+      "id": "US-002",
+      "title": "Raw Mode Terminal Setup and Teardown",
+      "description": "As a developer, I need to put the terminal into raw mode on startup and restore it on exit so that the editor can receive individual key presses and control screen output.",
+      "acceptanceCriteria": [
+        "Implement Terminal struct in term/terminal.go that satisfies the Screen interface (stub methods are OK for now, Init/Fini must work)",
+        "Init() saves original termios state, sets raw mode using syscall package (no external deps)",
+        "Init() sends ANSI sequences to enter alternate screen buffer (\\033[?1049h) and hide cursor (\\033[?25l)",
+        "Fini() restores original termios, exits alternate screen buffer (\\033[?1049l), shows cursor (\\033[?25h)",
+        "Terminal is properly restored even on panic (using defer pattern)",
+        "go build ./term/ succeeds with zero external dependencies",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Use syscall.SYS_IOCTL with TCGETS/TCSETS for termios on Linux. The syscall package is part of Go stdlib."
+    },
+    {
+      "id": "US-003",
+      "title": "Screen Size Query and Resize Detection",
+      "description": "As a developer, I need to query the terminal size and detect resize events so that the editor can adapt its layout.",
+      "acceptanceCriteria": [
+        "Implement Size() method using TIOCGWINSZ ioctl via syscall package",
+        "Detect terminal resize via SIGWINCH signal using os/signal.Notify",
+        "Resize events are delivered as ResizeEvent through the same event channel as key events",
+        "go build ./term/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "TIOCGWINSZ constant is 0x5413 on Linux. Use syscall.Syscall with SYS_IOCTL."
+    },
+    {
+      "id": "US-004",
+      "title": "Screen Rendering with ANSI Escape Sequences",
+      "description": "As a developer, I need to render characters to the screen so that the editor can display buffer content, status line, and messages.",
+      "acceptanceCriteria": [
+        "Implement cell-based screen buffer ([][]Cell where Cell has rune and Style)",
+        "Clear() resets all cells to space with default style",
+        "SetContent(x, y, ch, style) sets a cell in the buffer",
+        "Show() diffs current buffer vs previous buffer and writes only changed cells using ANSI cursor positioning (\\033[row;colH)",
+        "Show() applies reverse video style using \\033[7m and resets with \\033[0m",
+        "ShowCursor(x, y) positions the hardware cursor using \\033[row;colH and shows it",
+        "Sync() forces full screen redraw (marks all cells as dirty)",
+        "Output is buffered with bufio.Writer and flushed once per Show() call",
+        "go build ./term/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "ANSI coordinates are 1-based (row 1, col 1 is top-left). Remember to convert from 0-based cell buffer indices."
+    },
+    {
+      "id": "US-005",
+      "title": "Keyboard Input Parsing",
+      "description": "As a developer, I need to read and parse keyboard input so that all existing Emacs keybindings work correctly.",
+      "acceptanceCriteria": [
+        "PollEvent() blocks on stdin read and returns parsed Event",
+        "Parses single-byte control characters: C-a through C-z (0x01-0x1A), C-SPC/NUL (0x00), Enter (0x0D), Backspace (0x7F), Escape (0x1B), Tab (0x09), C-_ (0x1F)",
+        "Parses ANSI escape sequences for arrow keys: \\033[A (Up), \\033[B (Down), \\033[C (Right), \\033[D (Left)",
+        "Parses Alt+key as Esc followed by character with ~50ms timeout to distinguish bare Esc",
+        "Reads multi-byte UTF-8 rune sequences for printable characters",
+        "PostEvent(ev) re-queues an event to be returned by the next PollEvent() call",
+        "go build ./term/ succeeds",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "Use select with time.After for Esc-prefix timeout. Read from os.Stdin into a byte buffer, then decode. PostEvent can use a buffered channel or queue."
+    },
+    {
+      "id": "US-006",
+      "title": "Automated Tests for Terminal Backend",
+      "description": "As a developer, I need tests for the pure Go terminal backend to verify correctness without a real terminal.",
+      "acceptanceCriteria": [
+        "Test keyboard input parsing: control characters map to correct KeyCode values",
+        "Test keyboard input parsing: ANSI escape sequences parse to correct arrow key events",
+        "Test keyboard input parsing: UTF-8 multi-byte sequences parse to correct runes",
+        "Test keyboard input parsing: Alt+key sequences produce ModAlt modifier",
+        "Test screen buffer: SetContent stores correct cell values, Clear resets all cells",
+        "Test screen rendering: cell diff only outputs changed cells",
+        "Test style: Reverse(true) and Reverse(false) produce correct Style values",
+        "Test PostEvent: re-queued events are returned before stdin events",
+        "go test ./term/ passes",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "For input parsing tests, inject a bytes.Reader or io.Reader instead of os.Stdin. For screen rendering tests, capture output to a bytes.Buffer."
+    },
+    {
+      "id": "US-007",
+      "title": "Integrate Pure Go Backend into main.go",
+      "description": "As a user, I want goomacs to use the pure Go terminal backend so that it has zero external dependencies.",
+      "acceptanceCriteria": [
+        "Update main.go to import goomacs/term instead of github.com/gdamore/tcell/v2",
+        "Replace all tcell.Key* constants with term.Key* equivalents",
+        "Replace all tcell.Style* usage with term.Style* equivalents",
+        "Replace tcell.EventKey / tcell.EventResize with term.KeyEvent / term.ResizeEvent",
+        "Replace tcell.Screen parameter types in drawBuffer, drawStatusLine, drawMessageLine with term.Screen",
+        "Remove github.com/gdamore/tcell/v2 from go.mod and go.sum via go mod tidy",
+        "go.mod contains zero require directives after go mod tidy",
+        "go build succeeds and produces working binary",
+        "go test ./... passes (both buffer tests and term tests)",
+        "Manual test: open file, edit text, save (C-x C-s), search (C-s), undo (C-_), mark/region (C-SPC, C-w), quit (C-x C-c)",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": "This is the final switchover. All term/ package functionality must be working before this story. The main.go changes are mostly mechanical find-and-replace of tcell types/constants with term equivalents."
+    }
+  ]
+}

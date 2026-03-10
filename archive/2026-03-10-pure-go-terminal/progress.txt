@@ -1,0 +1,122 @@
+## Codebase Patterns
+- Module name is `goomacs`, so term package imports as `goomacs/term`
+- main.go uses tcell types: Screen, EventKey, EventResize, StyleDefault, Key* constants, ModAlt
+- SetContent in tcell takes (x, y, ch, combining []rune, style) - our term.Screen drops combining runes param
+- tcell uses pointer receivers for events (*tcell.EventKey) - our term package matches this pattern
+- Terminal.in field (io.Reader) allows injecting test input for keyboard parsing tests
+- PollEvent uses two channels: `posted` (re-queued) has priority over `events` (stdin/resize)
+- Esc timeout is 50ms to distinguish bare Escape from Alt+key or ANSI sequences
+
+## Progress: Pure Go Terminal Backend
+
+## 2026-03-10 - US-001
+- Defined Screen interface, Event interface, KeyEvent, ResizeEvent, Style, KeyCode constants, ModMask constants in term/screen.go
+- Files changed: term/screen.go (new)
+- **Learnings for future iterations:**
+  - The interface is minimal, matching only what goomacs currently uses from tcell
+  - Style uses a bitmask approach (uint8) for extensibility
+  - Events use a marker method pattern (isEvent()) for the interface
+  - KeyCode constants start at 256 to leave room for rune values
+- TIOCGWINSZ (0x5413) returns winsize struct: Row, Col, X, Y (all uint16)
+- SIGWINCH signal is used to detect terminal resize; use os/signal.Notify
+- Terminal struct has an `events` channel (buffered, cap 64) for delivering events to PollEvent
+- Terminal raw mode uses TCGETS (0x5401) / TCSETS (0x5402) ioctl on Linux
+- Screen buffer uses [][]cell where cell has rune + Style; prev buffer used for diffing
+- ANSI coordinates are 1-based: \033[row;colH to position cursor
+- Reverse video: \033[7m to enable, \033[0m to reset
+- Show() uses bufio.Writer for buffered output, flushed once per call
+- Alternate screen buffer: \033[?1049h to enter, \033[?1049l to exit
+- termios struct layout matches Linux kernel (Iflag, Oflag, Cflag, Lflag, Line, Cc[32], Ispeed, Ospeed)
+---
+
+## 2026-03-10 - US-002
+- Implemented Terminal struct in term/terminal.go satisfying Screen interface
+- Init() saves original termios, sets raw mode via syscall.SYS_IOCTL (TCGETS/TCSETS), enters alternate screen, hides cursor
+- Fini() restores original termios, exits alternate screen, shows cursor
+- All other Screen methods are stubs for now (Size, PollEvent, PostEvent, Clear, SetContent, Show, ShowCursor, Sync)
+- Files changed: term/terminal.go (new)
+- **Learnings for future iterations:**
+  - Linux termios struct must match kernel layout exactly (including Line field between Lflag and Cc)
+  - TCGETS=0x5401, TCSETS=0x5402 on Linux (these are NOT the same as TCGETS on macOS)
+  - Raw mode flags: clear BRKINT|ICRNL|INPCK|ISTRIP|IXON on input, OPOST on output, ECHO|ICANON|IEXTEN|ISIG on local; set CS8 on control
+  - VMIN=1, VTIME=0 makes read block until at least 1 byte available
+---
+
+## 2026-03-10 - US-003
+- Implemented Size() using TIOCGWINSZ ioctl to query actual terminal dimensions
+- Added winsize struct and tiocgwinsz constant
+- Added events channel, sigwinch signal channel, and stopSig channel to Terminal struct
+- SIGWINCH handler goroutine posts ResizeEvent to events channel on terminal resize
+- Fini() stops signal handler and cleans up
+- Files changed: term/terminal.go
+- **Learnings for future iterations:**
+  - TIOCGWINSZ (0x5413) returns winsize with Row/Col as uint16; Size() returns (cols, rows) to match Screen interface convention
+  - winsize struct has 4 uint16 fields: Row, Col, X (pixel width), Y (pixel height)
+  - The events channel is shared infrastructure - future stories (US-004/US-005) will use it for keyboard input too
+  - signal.Stop() must be called in Fini() to clean up the SIGWINCH handler
+---
+
+## 2026-03-10 - US-004
+- Implemented cell-based screen buffer with diff-based rendering using ANSI escape sequences
+- Added cell type, makeBuffer helper, and screen buffer fields (cells, prev, width, height, cursorX, cursorY, out)
+- Clear() resets all cells to space with default style
+- SetContent() stores cell data, bounds-checked
+- Show() diffs current vs previous buffer, writes only changed cells with ANSI cursor positioning
+- Show() applies reverse video (\033[7m) and resets (\033[0m) per cell
+- ShowCursor() stores cursor position, Show() positions hardware cursor and shows it
+- Sync() marks all prev cells dirty to force full redraw
+- Output buffered via bufio.Writer, flushed once per Show()
+- resize() handles terminal size changes by reallocating buffers
+- Files changed: term/terminal.go
+- **Learnings for future iterations:**
+  - Use sentinel value (ch = -1) in prev buffer to force initial draw
+  - ANSI is 1-based so always +1 when converting from 0-based buffer indices
+  - bufio.Writer wrapping os.Stdout is efficient for batching escape sequences
+  - resize() must be called at the start of Show() to handle size changes gracefully
+---
+
+## 2026-03-10 - US-005
+- Implemented keyboard input parsing in term/terminal.go
+- PollEvent() blocks and returns parsed events; PostEvent() re-queues events with priority
+- readInput() goroutine reads from t.in (io.Reader) and calls parseInput()
+- parseInput() handles: control chars (0x00-0x1A, 0x1F, 0x7F), printable ASCII, multi-byte UTF-8
+- parseEscSequence() handles: CSI arrow keys (\033[A/B/C/D), Alt+key (Esc + char)
+- Bare Escape detected via 50ms timeout when Esc byte arrives alone
+- Added `posted` channel for re-queued events, `in` field for injectable input reader
+- Files changed: term/terminal.go
+- **Learnings for future iterations:**
+  - PollEvent priority: check `posted` channel first (non-blocking), then select on both
+  - Esc timeout uses goroutine + select with time.After; leftover bytes from goroutine are re-parsed
+  - Control char mapping: 0x01=C-a, 0x09=Tab, 0x0d=Enter, 0x1f=C-_, 0x7f=Backspace2
+  - The `in` field defaults to os.Stdin but can be set to bytes.Reader for testing
+---
+
+## 2026-03-10 - US-006
+- Implemented comprehensive test suite in term/terminal_test.go (16 tests)
+- Tests cover: control char parsing, special keys (NUL, Tab, Enter, C-_, Backspace), ANSI arrow key sequences, UTF-8 multi-byte runes, Alt+key modifier, Alt+control char, SetContent/Clear, screen diff rendering, reverse video style, Style.Reverse(), PostEvent priority, Sync dirty marking, integration tests with injected reader
+- Files changed: term/terminal_test.go (new)
+- **Learnings for future iterations:**
+  - showForTest() method added to Terminal in test file to avoid Size() syscall during rendering tests
+  - newTestTerminal() helper creates Terminal with channels and buffers without Init() syscall
+  - parseInput() can be called directly for unit testing input parsing (no goroutine needed)
+  - drainEvents() helper reads all buffered events for assertion
+  - readInput() works with bytes.Reader for integration-style tests (returns on EOF)
+---
+
+## 2026-03-10 - US-007
+- Integrated pure Go terminal backend into main.go, replacing tcell dependency
+- Replaced `github.com/gdamore/tcell/v2` import with `goomacs/term`
+- Replaced all tcell type references: `*tcell.EventKey` → `*term.KeyEvent`, `*tcell.EventResize` → `*term.ResizeEvent`, `tcell.Screen` → `term.Screen`
+- Replaced `tcell.NewScreen()` with `term.NewTerminal()` (no error return from constructor)
+- Replaced all tcell.Key* constants with term.Key* equivalents
+- Replaced `tcell.StyleDefault` with `term.StyleDefault`, `tcell.ModAlt` with `term.ModAlt`
+- Removed `nil` combining runes parameter from all SetContent calls (term.SetContent takes 4 args vs tcell's 5)
+- Ran `go mod tidy` to remove tcell and all transitive dependencies from go.mod/go.sum
+- go.mod now has zero require directives (pure Go, zero external dependencies)
+- Files changed: main.go, go.mod, go.sum
+- **Learnings for future iterations:**
+  - The migration was mostly mechanical find-and-replace of tcell → term types/constants
+  - Key API difference: term.SetContent drops the `combining []rune` parameter that tcell has
+  - term.NewTerminal() returns *Terminal directly (no error), Init() is where errors happen
+  - All existing buffer tests (goomacs package) and term tests pass after migration
+---

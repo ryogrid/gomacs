@@ -1,9 +1,11 @@
 package term
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"unsafe"
 )
@@ -34,6 +36,12 @@ type winsize struct {
 	Y   uint16
 }
 
+// cell represents a single character cell on the screen.
+type cell struct {
+	ch    rune
+	style Style
+}
+
 // Terminal is a pure Go terminal backend implementing the Screen interface.
 type Terminal struct {
 	origTermios *termios
@@ -41,6 +49,14 @@ type Terminal struct {
 	events      chan Event
 	sigwinch    chan os.Signal
 	stopSig     chan struct{}
+	// Screen buffer
+	cells    [][]cell // current buffer [row][col]
+	prev     [][]cell // previous buffer for diffing
+	width    int
+	height   int
+	cursorX  int
+	cursorY  int
+	out      *bufio.Writer
 }
 
 // NewTerminal creates a new Terminal instance.
@@ -80,6 +96,20 @@ func (t *Terminal) Init() error {
 	// Enter alternate screen buffer and hide cursor.
 	os.Stdout.WriteString("\033[?1049h") // enter alternate screen
 	os.Stdout.WriteString("\033[?25l")   // hide cursor
+
+	// Set up buffered output.
+	t.out = bufio.NewWriter(os.Stdout)
+
+	// Initialize screen buffers.
+	t.width, t.height = t.Size()
+	t.cells = makeBuffer(t.width, t.height)
+	t.prev = makeBuffer(t.width, t.height)
+	// Mark all prev cells as different so first Show() draws everything.
+	for r := range t.prev {
+		for c := range t.prev[r] {
+			t.prev[r][c].ch = -1 // sentinel: never matches
+		}
+	}
 
 	// Set up event channel and SIGWINCH handler.
 	t.events = make(chan Event, 64)
@@ -171,12 +201,108 @@ func (t *Terminal) Size() (int, int) {
 	return int(ws.Col), int(ws.Row)
 }
 
-// Stub methods to satisfy the Screen interface.
+// makeBuffer allocates a screen buffer of the given size filled with spaces.
+func makeBuffer(width, height int) [][]cell {
+	buf := make([][]cell, height)
+	for r := range buf {
+		buf[r] = make([]cell, width)
+		for c := range buf[r] {
+			buf[r][c] = cell{ch: ' ', style: StyleDefault}
+		}
+	}
+	return buf
+}
 
-func (t *Terminal) PollEvent() Event               { return nil }
-func (t *Terminal) PostEvent(ev Event)              {}
-func (t *Terminal) Clear()                          {}
-func (t *Terminal) SetContent(x, y int, ch rune, style Style) {}
-func (t *Terminal) Show()                           {}
-func (t *Terminal) ShowCursor(x, y int)             {}
-func (t *Terminal) Sync()                           {}
+// Clear resets all cells to space with default style.
+func (t *Terminal) Clear() {
+	for r := range t.cells {
+		for c := range t.cells[r] {
+			t.cells[r][c] = cell{ch: ' ', style: StyleDefault}
+		}
+	}
+}
+
+// SetContent sets a cell in the buffer. Out-of-bounds writes are ignored.
+func (t *Terminal) SetContent(x, y int, ch rune, style Style) {
+	if y >= 0 && y < t.height && x >= 0 && x < t.width {
+		t.cells[y][x] = cell{ch: ch, style: style}
+	}
+}
+
+// Show diffs current buffer vs previous buffer and writes only changed cells.
+func (t *Terminal) Show() {
+	// Resize buffers if terminal size changed.
+	w, h := t.Size()
+	if w != t.width || h != t.height {
+		t.resize(w, h)
+	}
+
+	for r := 0; r < t.height; r++ {
+		for c := 0; c < t.width; c++ {
+			cur := t.cells[r][c]
+			if cur != t.prev[r][c] {
+				// Move cursor to position (ANSI is 1-based).
+				t.out.WriteString("\033[")
+				t.out.WriteString(strconv.Itoa(r + 1))
+				t.out.WriteByte(';')
+				t.out.WriteString(strconv.Itoa(c + 1))
+				t.out.WriteByte('H')
+				// Apply style.
+				if cur.style.IsReverse() {
+					t.out.WriteString("\033[7m")
+				}
+				// Write character.
+				t.out.WriteRune(cur.ch)
+				// Reset style if we applied reverse.
+				if cur.style.IsReverse() {
+					t.out.WriteString("\033[0m")
+				}
+				t.prev[r][c] = cur
+			}
+		}
+	}
+
+	// Position hardware cursor and show it.
+	t.out.WriteString("\033[")
+	t.out.WriteString(strconv.Itoa(t.cursorY + 1))
+	t.out.WriteByte(';')
+	t.out.WriteString(strconv.Itoa(t.cursorX + 1))
+	t.out.WriteByte('H')
+	t.out.WriteString("\033[?25h") // show cursor
+
+	t.out.Flush()
+}
+
+// ShowCursor positions the hardware cursor.
+func (t *Terminal) ShowCursor(x, y int) {
+	t.cursorX = x
+	t.cursorY = y
+}
+
+// Sync forces a full screen redraw by marking all previous cells as dirty.
+func (t *Terminal) Sync() {
+	for r := range t.prev {
+		for c := range t.prev[r] {
+			t.prev[r][c].ch = -1 // sentinel
+		}
+	}
+}
+
+// resize adjusts the screen buffers to a new terminal size.
+func (t *Terminal) resize(w, h int) {
+	t.width = w
+	t.height = h
+	t.cells = makeBuffer(w, h)
+	t.prev = makeBuffer(w, h)
+	// Mark all prev dirty so everything redraws.
+	for r := range t.prev {
+		for c := range t.prev[r] {
+			t.prev[r][c].ch = -1
+		}
+	}
+}
+
+// Stub methods for events (to be implemented in US-005).
+
+func (t *Terminal) PollEvent() Event  { return nil }
+func (t *Terminal) PostEvent(ev Event) {}

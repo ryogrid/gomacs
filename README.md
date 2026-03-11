@@ -52,12 +52,15 @@ go build -o goomacs .
 | M-> | End of buffer |
 | C-v | Scroll down one page |
 | M-v | Scroll up one page |
+| C-l | Goto line (prompts for line number) |
 
 ### Editing
 
 | Key | Action |
 |-----|--------|
+| C-h | Backspace (delete character before cursor) |
 | C-d | Delete character at cursor |
+| C-j | Newline (same as Enter) |
 | C-k | Kill line (cut to end of line) |
 | C-SPC | Set mark |
 | C-w | Kill region (cut) |

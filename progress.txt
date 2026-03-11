@@ -16,7 +16,75 @@
 - Minibuffer: minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback — Tab handler checks prompt to decide completion type
 - Alt keys dispatched at ~line 983 in main.go: M-v, M-w, M-<, M->
 - regionBounds() returns (startR, startC, endR, endC); SaveUndo() snapshots for single-step undo
+- detectCommentStyle(filename, content) returns CommentStyle; check LinePrefix != "" for line comments, else use BlockStart/BlockEnd
 - CaptureWithEscapes() on Harness captures tmux pane with ANSI escapes preserved (-e flag)
 - e2e/ directory contains E2E tests; harness.go provides Harness struct for tmux-based testing
 
 ## Progress: Command Palette and Comment Region
+
+## 2026-03-11 - US-001
+- Implemented command registry infrastructure in command.go
+- Files changed: command.go (new)
+- **Learnings for future iterations:**
+  - Command struct uses `func(*Buffer, *string)` signature — buffer access + message feedback
+  - commands is a package-level slice, not a map — FindCommandsByPrefix does linear scan
+  - RegisterCommand should be called from init() functions in later stories
+---
+
+## 2026-03-11 - US-002
+- Implemented M-x prompt activation via Alt+X and Esc+x key bindings
+- Added minibuffer callback that looks up commands via FindCommand and executes or shows "Unknown command"
+- Added Escape key as cancel option alongside C-g in minibuffer mode
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Edit tool struggles with tab-indented Go code — use python3 script for reliable string replacement
+  - Minibuffer cancel uses `term.KeyCtrlG, term.KeyEsc` combined case
+  - Both Alt+key (ModAlt) and Esc-prefix sections need matching cases for M-x bindings
+  - The M-x prompt string is "M-x " (with trailing space) — this is used for tab completion matching in US-003
+---
+
+## 2026-03-11 - US-003
+- Added tab completion for M-x commands in the minibuffer Tab handler
+- Tab with empty input shows all commands; single match auto-completes; multiple matches shown space-separated in message line
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - FindCommandsByPrefix("") returns all commands since every string has prefix "" — no special case needed for empty input
+  - The Tab handler uses `else if` chains on minibufferPrompt to dispatch to different completion logic
+  - python3 script approach works reliably for tab-indented Go code edits (confirmed from US-002 learning)
+---
+
+## 2026-03-11 - US-004
+- Added go-enry/go-enry/v2 dependency for language detection
+- Defined CommentStyle struct and commentStyles map covering 30 languages in command.go
+- Implemented detectCommentStyle() using enry.GetLanguage() with fallback to '#' prefix
+- Files changed: command.go, go.mod, go.sum
+- **Learnings for future iterations:**
+  - go-enry import alias: `enry "github.com/go-enry/go-enry/v2"` — use `enry.GetLanguage(filename, []byte(content))`
+  - Languages with only block comments (HTML, XML, CSS) have empty LinePrefix — check LinePrefix vs BlockStart to decide comment strategy
+  - Default fallback is `CommentStyle{LinePrefix: "#"}` for unknown languages
+  - go-enry also pulled in go-oniguruma as transitive dependency
+---
+
+## 2026-03-11 - US-005
+- Implemented commentRegion function registered as 'comment-region' via init()
+- Handles both line prefix (prepends "prefix ") and block comment (wraps "BlockStart line BlockEnd") styles
+- Uses detectCommentStyle for language detection, regionBounds for row range
+- Files changed: command.go
+- **Learnings for future iterations:**
+  - RegisterCommand calls go in init() functions — keeps registration close to the handler
+  - buf.Lines[row] is []rune — prepend via append([]rune(prefix), line...) pattern
+  - For block comments, build entire new line as string then convert to []rune
+  - commentRegion and uncommentRegion share the same pattern: check MarkActive, SaveUndo, get bounds, detect style, modify lines, set Modified/HighlightDirty, DeactivateMark
+---
+
+## 2026-03-11 - US-006
+- Implemented uncommentRegion function registered as 'uncomment-region' via init()
+- Handles line prefix removal (with/without trailing space, tolerating leading whitespace)
+- Handles block comment removal (BlockStart/BlockEnd with optional surrounding spaces)
+- Lines without comment markers are left unchanged
+- Files changed: command.go, prd.json
+- **Learnings for future iterations:**
+  - strings.TrimLeft + strings.Index pattern preserves indentation while finding the comment prefix
+  - For line comments: check "prefix " (with space) first, then "prefix" (without) to prefer removing the space
+  - For block comments: handle start and end independently since each may or may not have adjacent space
+---

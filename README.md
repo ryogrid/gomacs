@@ -18,7 +18,9 @@ goomacs provides a familiar Emacs keybinding experience for quick file editing w
 - **Multiple buffers** -- Open and switch between multiple files (C-x b, C-x C-f, C-x C-b)
 - **Window splitting** -- Split the screen vertically (C-x 2) or horizontally side-by-side (C-x 3) to view multiple buffers at once
 - **Syntax highlighting** -- Automatic syntax coloring for source code files using Chroma (monokai theme, 256-color)
-- **Tab completion** -- Filename completion in find-file prompt (Tab key)
+- **M-x command palette** -- Execute commands by name with tab completion (M-x)
+- **Comment/uncomment region** -- Toggle comments on selected code with automatic language detection (30+ languages)
+- **Tab completion** -- Filename and command name completion in prompts (Tab key)
 - **Goto line** -- Jump to any line by number (C-l)
 - **Minimal dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences
 
@@ -99,6 +101,21 @@ go build -o goomacs .
 | C-x 0 | Close current window |
 | C-x 1 | Close all other windows |
 
+### Command Palette
+
+| Key | Action |
+|-----|--------|
+| M-x | Open command prompt (type command name, Tab to complete, Enter to execute) |
+
+**Available commands:**
+
+| Command | Description |
+|---------|-------------|
+| comment-region | Comment out the selected region (requires active mark) |
+| uncomment-region | Remove comments from the selected region |
+
+Language detection is automatic (powered by go-enry). Supported languages include Go, Python, JavaScript, TypeScript, Rust, C, C++, Java, Ruby, Shell, HTML, CSS, SQL, Haskell, Lisp, and 15+ more. For unrecognized languages, `#` is used as the default comment prefix.
+
 ## Status Bar
 
 The status bar at the bottom of the screen shows:
@@ -112,6 +129,7 @@ The status bar at the bottom of the screen shows:
 goomacs/
 ├── main.go              # Event loop, keybinding dispatch, and UI rendering
 ├── buffer.go            # Buffer data structure and editing operations
+├── command.go           # Command registry, M-x commands, comment/uncomment logic
 ├── highlight.go         # Chroma-based syntax highlighting module
 ├── buffer_test.go       # Buffer unit tests (69 tests)
 ├── main_test.go         # Main package tests
@@ -142,6 +160,7 @@ goomacs/
 ## Dependencies
 
 - [github.com/alecthomas/chroma/v2](https://github.com/alecthomas/chroma) -- Syntax highlighting (lexers and themes)
+- [github.com/go-enry/go-enry/v2](https://github.com/go-enry/go-enry) -- Programming language detection for comment style lookup
 - [github.com/mattn/go-runewidth](https://github.com/mattn/go-runewidth) -- Unicode character width calculation (East Asian wide characters, etc.)
 
 All terminal handling uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) via ANSI/VT100 escape sequences.

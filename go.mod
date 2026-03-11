@@ -6,5 +6,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.23.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
+	github.com/go-enry/go-enry/v2 v2.9.5 // indirect
+	github.com/go-enry/go-oniguruma v1.2.1 // indirect
 	github.com/mattn/go-runewidth v0.0.21 // indirect
 )

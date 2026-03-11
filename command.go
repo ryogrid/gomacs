@@ -1,6 +1,60 @@
 package main
 
-import "strings"
+import (
+	"strings"
+
+	enry "github.com/go-enry/go-enry/v2"
+)
+
+// CommentStyle holds the comment delimiters for a language.
+type CommentStyle struct {
+	LinePrefix string
+	BlockStart string
+	BlockEnd   string
+}
+
+// commentStyles maps language names (as returned by go-enry) to their comment delimiters.
+var commentStyles = map[string]CommentStyle{
+	"Go":            {LinePrefix: "//"},
+	"Python":        {LinePrefix: "#"},
+	"JavaScript":    {LinePrefix: "//"},
+	"TypeScript":    {LinePrefix: "//"},
+	"Rust":          {LinePrefix: "//"},
+	"C":             {LinePrefix: "//"},
+	"C++":           {LinePrefix: "//"},
+	"Java":          {LinePrefix: "//"},
+	"Kotlin":        {LinePrefix: "//"},
+	"Swift":         {LinePrefix: "//"},
+	"Ruby":          {LinePrefix: "#"},
+	"PHP":           {LinePrefix: "//"},
+	"Shell":         {LinePrefix: "#"},
+	"Perl":          {LinePrefix: "#"},
+	"Lua":           {LinePrefix: "--"},
+	"R":             {LinePrefix: "#"},
+	"SQL":           {LinePrefix: "--"},
+	"HTML":          {BlockStart: "<!--", BlockEnd: "-->"},
+	"XML":           {BlockStart: "<!--", BlockEnd: "-->"},
+	"CSS":           {BlockStart: "/*", BlockEnd: "*/"},
+	"SCSS":          {LinePrefix: "//"},
+	"Haskell":       {LinePrefix: "--"},
+	"Common Lisp":   {LinePrefix: ";"},
+	"Clojure":       {LinePrefix: ";"},
+	"Scheme":        {LinePrefix: ";"},
+	"Erlang":        {LinePrefix: "%"},
+	"Elixir":        {LinePrefix: "#"},
+	"YAML":          {LinePrefix: "#"},
+	"TOML":          {LinePrefix: "#"},
+	"Makefile":      {LinePrefix: "#"},
+}
+
+// detectCommentStyle detects the language of the given file and returns its comment style.
+func detectCommentStyle(filename string, content string) CommentStyle {
+	lang := enry.GetLanguage(filename, []byte(content))
+	if style, ok := commentStyles[lang]; ok {
+		return style
+	}
+	return CommentStyle{LinePrefix: "#"}
+}
 
 // Command represents a named editor command.
 type Command struct {

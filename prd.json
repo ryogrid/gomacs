@@ -1,113 +1,58 @@
 {
   "project": "goomacs",
-  "branchName": "ralph/horizontal-window-split",
-  "description": "Horizontal Window Splitting - Add side-by-side window splitting with C-x 3, vertical separators, and uniform split orientation",
+  "branchName": "ralph/ctrl-key-bindings",
+  "description": "Additional Ctrl Key Bindings - Add C-h (backspace), C-j (enter), and C-l (goto-line) keybindings",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Add split orientation state and Window struct fields",
-      "description": "As a developer, I need to track split orientation and add column/width fields to Window so the layout engine can arrange windows either vertically or horizontally.",
+      "title": "C-h as Backspace in all modes",
+      "description": "As a user, I want C-h to delete the character before the cursor so that I can backspace without leaving the home row.",
       "acceptanceCriteria": [
-        "Add a splitMode variable with values 'vertical' or 'horizontal', defaulting to 'vertical'",
-        "Add StartCol (int) and Width (int) fields to the Window struct",
-        "In vertical mode, StartCol defaults to 0 and Width defaults to screenWidth for all windows",
-        "When only one window exists, splitMode resets to 'vertical' (allowing either split type next)",
-        "recalcWindows sets StartCol=0 and Width=screenWidth for all windows in vertical mode",
-        "Existing C-x 2 vertical split behavior is unchanged",
-        "Existing C-x o, C-x 0, C-x 1 behavior is unchanged",
-        "go build succeeds",
-        "Typecheck passes"
+        "In normal editing mode, C-h (term.KeyCtrlH) behaves identically to Backspace: calls buf.SaveUndo() then buf.Backspace()",
+        "In search mode, C-h removes the last character from the search query (add term.KeyCtrlH to the existing Backspace case)",
+        "In minibuffer mode, C-h removes the last character from the minibuffer input (add term.KeyCtrlH to the existing Backspace case)",
+        "go build . succeeds",
+        "go test ./... passes"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "This is a foundational change. Add the fields and state variable but keep all existing behavior identical. The new fields are set but not yet used by rendering (that comes in later stories). Make sure recalcWindows always sets StartCol and Width even in vertical mode."
+      "passes": false,
+      "notes": "Simple change: add term.KeyCtrlH to every existing 'case term.KeyBackspace, term.KeyBackspace2:' in main.go. There are three locations: search mode handler, minibuffer mode handler, and normal mode handler."
     },
     {
       "id": "US-002",
-      "title": "Implement C-x 3 horizontal split command",
-      "description": "As a user, I want to press C-x 3 to split the current window side-by-side so I can view two buffers next to each other.",
+      "title": "C-j as Enter in all modes",
+      "description": "As a user, I want C-j to insert a newline so that I can press Enter without leaving the home row.",
       "acceptanceCriteria": [
-        "C-x 3 creates a new window to the right of the active window, showing the same buffer and scroll offset",
-        "If only one window exists, C-x 3 sets splitMode to 'horizontal' and creates the split",
-        "If splitMode is 'vertical' and there are already multiple windows, C-x 3 shows message 'Cannot split horizontally while in vertical split mode'",
-        "If splitMode is 'horizontal', C-x 3 adds another horizontal window",
-        "Similarly, C-x 2 shows message 'Cannot split vertically while in horizontal split mode' when splitMode is 'horizontal' with multiple windows",
-        "After C-x 3, recalcWindows is called to redistribute layout",
-        "Minimum window width enforced at 10 columns; reject split if it would make windows too narrow, showing a message",
-        "Typecheck passes"
+        "In normal editing mode, C-j (term.KeyCtrlJ) behaves identically to Enter: handles Buffer List special case, otherwise calls buf.SaveUndo() then buf.InsertNewline()",
+        "In search mode, C-j exits search and accepts the current match (add term.KeyCtrlJ to the existing Enter case)",
+        "In minibuffer mode, C-j accepts the input and calls the callback (add term.KeyCtrlJ to the existing Enter case)",
+        "In confirm mode, C-j does NOT act as 'yes' — only 'y'/'n' rune keys are valid (no change needed, confirm mode checks ev.Key() == term.KeyRune)",
+        "go build . succeeds",
+        "go test ./... passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Mirror the existing C-x 2 implementation in the C-x prefix handler. The key difference is setting splitMode to 'horizontal' and the mutual exclusion check. Use the same insert-after-active pattern as C-x 2."
+      "passes": false,
+      "notes": "Simple change: add term.KeyCtrlJ to every existing 'case term.KeyEnter:' in main.go. There are three locations: search mode handler, minibuffer mode handler, and normal mode handler. Confirm mode already only responds to KeyRune 'y'/'n', so no change needed there."
     },
     {
       "id": "US-003",
-      "title": "Update recalcWindows for horizontal layout",
-      "description": "As a developer, I need recalcWindows to distribute screen width evenly among horizontal windows, accounting for separator columns.",
+      "title": "C-l Goto Line via minibuffer",
+      "description": "As a user, I want to press C-l to be prompted for a line number and jump directly to that line, so that I can navigate large files quickly.",
       "acceptanceCriteria": [
-        "When splitMode is 'horizontal', available width = screenWidth - (n-1) separator columns, where n is window count",
-        "Each window gets baseWidth = available / n columns, with remainder distributed to first windows",
-        "Each window's StartCol is calculated as sum of previous windows' widths plus separator columns",
-        "Each horizontal window has StartRow=0 and Height=screenHeight-1 (full height minus message line)",
-        "Separator columns are 1 character wide, positioned between adjacent windows",
-        "recalcWindows accepts or has access to both screenWidth and screenHeight",
-        "Typecheck passes"
+        "C-l (term.KeyCtrlL) in normal mode activates the minibuffer with prompt 'Goto line: '",
+        "Entering a valid number (e.g. '42') moves cursor to that line (1-based: line 1 = first line), with CursorC set to 0",
+        "If the number exceeds total lines, cursor moves to the last line",
+        "If the number is less than 1 or not a valid integer, message 'Invalid line number' is shown and cursor does not move",
+        "After jumping, message line shows 'Line N' where N is the 1-based line number jumped to",
+        "Window scroll adjusts to make target line visible (via existing AdjustScroll in redraw)",
+        "C-g cancels the goto-line prompt without moving the cursor",
+        "Uses strconv.Atoi to parse input; strconv must be imported if not already",
+        "go build . succeeds",
+        "go test ./... passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "recalcWindows currently takes (windows, screenHeight). It needs screenWidth too. Either add the parameter or use a package-level variable. The separator columns are implicit — they are the gaps between windows that will be drawn in a later story."
-    },
-    {
-      "id": "US-004",
-      "title": "Render side-by-side window content and status lines",
-      "description": "As a user, I want each side-by-side window to display its buffer content within its allocated column range so I can read both buffers independently.",
-      "acceptanceCriteria": [
-        "drawWindowContent respects window's StartCol and Width: each cell is drawn at screen column StartCol + visualCol",
-        "Lines longer than the window Width are truncated at the window boundary (no overflow into adjacent windows or separator)",
-        "Tab expansion respects window width boundaries",
-        "Each horizontal window has its own status line at the bottom of its region, constrained to its column range",
-        "Active window status line uses reverse video (== markers); inactive uses dashes (-- markers)",
-        "Syntax highlighting works correctly within each window's column bounds",
-        "Empty area beyond end-of-line within a window is blank (no artifacts from adjacent windows)",
-        "Typecheck passes"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": "The main change is in drawWindowContent: all SetContent calls must add StartCol offset to the column. Line rendering must stop at StartCol+Width. drawWindowStatusLine must also be bounded to the window's column range. In vertical mode, StartCol=0 and Width=screenWidth, so existing behavior is preserved."
-    },
-    {
-      "id": "US-005",
-      "title": "Draw vertical separators and position cursor correctly",
-      "description": "As a user, I want to see vertical separator lines between side-by-side windows and have the cursor appear at the correct position in the active window.",
-      "acceptanceCriteria": [
-        "A '│' (U+2502) character is drawn in each separator column between adjacent horizontal windows",
-        "The separator spans from row 0 to the bottom of the window area (screenHeight-2, excluding message line)",
-        "The separator uses default terminal foreground color (StyleDefault)",
-        "Hardware cursor is placed at the correct (row, col) accounting for the active window's StartCol offset",
-        "Cursor positioning works correctly for both vertical and horizontal split modes",
-        "In vertical mode, no separators are drawn (existing behavior preserved)",
-        "Typecheck passes"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": "Draw separators in the redraw function after drawing all window contents. The separator column for window i is at windows[i].StartCol + windows[i].Width (the column immediately after the window). Cursor: in ShowCursor call, add activeWin.StartCol to the column offset."
-    },
-    {
-      "id": "US-006",
-      "title": "Adapt window close and resize for horizontal splits",
-      "description": "As a user, I want C-x 0, C-x 1, and terminal resize to work correctly with side-by-side windows.",
-      "acceptanceCriteria": [
-        "C-x 0 closes the active horizontal window and redistributes width to remaining windows",
-        "C-x 1 closes all windows except the active one and resets splitMode to 'vertical'",
-        "When closing a window brings count to 1, splitMode resets to 'vertical'",
-        "On terminal resize, recalcWindows redistributes width evenly in horizontal mode",
-        "If terminal becomes too narrow for all horizontal windows (each < 10 columns), excess rightmost windows are closed with warning message",
-        "C-x o cycles through horizontal windows left-to-right, wrapping around",
-        "Typecheck passes"
-      ],
-      "priority": 6,
-      "passes": true,
-      "notes": "C-x o already cycles by incrementing activeWindowIdx mod len(windows) — this works for both orientations since windows are stored left-to-right in the slice. C-x 0 and C-x 1 already work on the flat slice; just ensure splitMode resets when window count reaches 1."
+      "passes": false,
+      "notes": "Add a new case term.KeyCtrlL in the normal mode key handler. Use the existing minibuffer infrastructure: set minibufferMode=true, minibufferPrompt='Goto line: ', minibufferInput=nil, and minibufferCallback to a closure that parses the input with strconv.Atoi, validates, sets buf.CursorR and buf.CursorC=0. The closure captures buf. AdjustScroll happens automatically in redraw()."
     }
   ]
 }

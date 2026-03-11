@@ -1,0 +1,89 @@
+## Codebase Patterns
+- Module name is `goomacs`, so term package imports as `goomacs/term`
+- main.go uses term.Screen interface with term.KeyEvent, term.ResizeEvent, term.Style types
+- Buffer struct holds Lines, CursorR/C, ScrollOffset, Modified, Filename, KillRing, Mark, UndoStack
+- Event loop in main.go: PollEvent → dispatch by mode (search/C-x prefix/normal) → redraw
+- cell struct in terminal.go: {ch rune, style Style} — used for diff-based rendering in Show()
+- Style is now a struct (fg Color, bg Color, reverse bool, bold bool); StyleDefault is a var, not const
+- writeStyledCell() on Terminal emits combined ANSI sequence
+- Highlighter in highlight.go: NewHighlighter(filename) → nil if no lexer; Highlight(lines) caches [][]term.Style; StyleAt(row,col) returns cached style
+- drawWindowContent(screen, win, sh) renders buffer content in window's row range
+- Tab expansion handled in rendering (bufColToVisualCol)
+- `buf` is a local alias for `buffers[activeBufferIdx]`
+- Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
+- recalcWindows(windows, screenHeight) distributes height evenly, reserves 1 row for message line
+- C-x 2 splits vertically (top/bottom), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
+
+## Progress: Horizontal Window Split
+
+## 2026-03-10 - US-006
+- What was implemented: Added resize-time narrowing protection for horizontal splits
+- On terminal resize in horizontal mode, if windows would be < 10 columns each, rightmost windows are closed iteratively until all fit
+- When window count drops to 1 from closing, splitMode resets to "vertical"
+- C-x 0, C-x 1, C-x o already worked correctly for horizontal splits (no changes needed)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Most of US-006 was already implemented by prior stories (C-x 0/1/o all work on the flat windows slice)
+  - Resize narrowing: close rightmost windows in a loop until `available/n >= 10` where `available = screenWidth - (n-1)`
+  - After closing windows in resize handler, must update buf and activeBufferIdx to match new activeWin
+---
+
+## 2026-03-10 - US-005
+- What was implemented: Vertical separators between horizontal windows and correct cursor positioning
+- Added separator drawing in redraw(): iterates windows 0..n-2, draws '│' (U+2502) at sepCol = win.StartCol + win.Width for each row 0..screenHeight-2
+- Separators only drawn when splitMode == "horizontal" && len(windows) > 1
+- Fixed cursor positioning: added activeWin.StartCol offset to ShowCursor x coordinate
+- In vertical mode, no separators drawn and StartCol=0, so existing behavior preserved
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Separator column for window i is at windows[i].StartCol + windows[i].Width (the gap before next window)
+  - Separators span rows 0 to screenHeight-2 (excluding the message line row)
+  - Cursor x = activeWin.StartCol + bufColToVisualCol(...)
+---
+
+## 2026-03-10 - US-004
+- What was implemented: Updated drawWindowContent and drawWindowStatusLine to respect window's StartCol and Width
+- drawWindowContent: uses win.Width instead of screen width for boundary checks, adds win.StartCol offset to all SetContent calls
+- drawWindowStatusLine: constrains fill, left text, and right text to win.StartCol..StartCol+Width range
+- In vertical mode (StartCol=0, Width=screenWidth), behavior is identical to before
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - Pattern: replace `width, _ := screen.Size()` with `winWidth := win.Width` in rendering functions
+  - All SetContent calls must use `win.StartCol + col` for the x coordinate
+  - Status line right-alignment calculation uses winWidth, then adds win.StartCol when drawing
+---
+
+## 2026-03-10 - US-003
+- What was implemented: Updated recalcWindows to handle horizontal (side-by-side) layout
+- In horizontal mode: available width = screenWidth - (n-1) separators, distributed evenly with remainder to first windows
+- Each window gets StartRow=0, Height=screenHeight-1, StartCol computed as cumulative widths + separator gaps
+- Vertical mode logic unchanged, just moved into else branch
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - recalcWindows now branches on `splitMode == "horizontal" && n > 1`
+  - Separator columns are implicit (+1 gap in col accumulator); actual drawing happens in US-005
+  - In horizontal mode, last window's col calculation leaves no trailing separator (correct)
+---
+
+## 2026-03-10 - US-002
+- What was implemented: C-x 3 horizontal split command with mutual exclusion logic
+- Added case '3' in C-x prefix handler that creates side-by-side windows, sets splitMode to "horizontal"
+- Added mutual exclusion: C-x 2 rejects split when in horizontal mode with multiple windows (and vice versa)
+- Enforced minimum 10-column window width; rejects split with message if too narrow
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - C-x 2 handler is now at case '2' with splitMode guard (lines ~583-601)
+  - C-x 3 handler follows at case '3' (lines ~602-636)
+  - Minimum width check: availableWidth = screenWidth - (newCount-1) separators, each window needs ≥10
+  - splitMode is set to "horizontal" only when splitting from a single window with C-x 3
+---
+
+## 2026-03-10 - US-001
+- What was implemented: Split orientation state (`splitMode` var) and Window struct fields (`StartCol`, `Width`) were already present on master from prior work
+- Verified all acceptance criteria: splitMode defaults to "vertical", StartCol/Width set in recalcWindows, splitMode resets when window count reaches 1, existing C-x 2/o/0/1 behavior unchanged, go build passes
+- Files changed: None (already implemented)
+- **Learnings for future iterations:**
+  - recalcWindows already accepts both screenWidth and screenHeight parameters
+  - splitMode resets happen in C-x 0 (line 617) and C-x 1 (line 635) handlers
+  - C-x 2 handler is at the `case '2':` inside `case term.KeyRune:` inside the C-x prefix block
+---

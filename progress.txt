@@ -56,3 +56,15 @@
   - Smoke test: wait for *scratch*, send C-x then C-c with 50ms gap, verify session gone
   - tmux has-session -t <session> returns error when session doesn't exist
 ---
+
+## 2026-03-11 - US-004
+- Implemented basic editing E2E tests in e2e/basic_test.go
+- Tests: ScratchBuffer, TextInsertion, Backspace, DeleteForward, Newline, Save, Quit
+- Files changed: e2e/basic_test.go (new)
+- **Learnings for future iterations:**
+  - C-x C-s save: use 50ms gap between C-x and C-s, then 500ms wait for disk write
+  - Quit with unmodified buffer exits immediately (no confirmation needed)
+  - For backspace test, verify both that shortened text exists AND full text is gone
+  - createTestFile with empty content works for save tests — open file, type, save, verify on disk
+  - All subtests use t.Run for organization within a test group
+---

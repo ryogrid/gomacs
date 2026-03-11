@@ -78,7 +78,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "For the save test, open goomacs with a temp file path, type some text, save with C-x C-s, then read the file from disk. For quit test, after C-x C-c send a small sleep then check if session exists. Use subtests (t.Run) for organization."
     },
     {

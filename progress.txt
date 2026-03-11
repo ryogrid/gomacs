@@ -80,3 +80,18 @@
   - For scroll tests (C-v/M-v), check that top line content changed rather than exact cursor position
   - 300ms sleep after scroll/jump commands gives enough time for screen redraw
 ---
+
+## 2026-03-11 - US-006
+- Implemented search E2E tests in e2e/search_test.go
+- Tests: ForwardSearch, SearchNext, BackwardSearch, SearchAccept, SearchCancel, SearchBackspace
+- Files changed: e2e/search_test.go (new)
+- **Learnings for future iterations:**
+  - C-s enters forward search mode; message line shows "I-search: <query>"
+  - C-r enters backward search mode; message line shows "I-search backward: <query>"
+  - C-s C-s (during search) advances to next match; cursor position changes
+  - Enter accepts search (cursor stays at match, message clears)
+  - C-g cancels search (cursor returns to original position)
+  - BSpace during search removes last query char; message line updates accordingly
+  - For backward search tests, move to end of buffer first with M-> so there's content to search backward through
+  - Search cursor position: cursor moves to start of match (e.g., "banana" at col 6 on row 0)
+---

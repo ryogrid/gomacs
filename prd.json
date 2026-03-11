@@ -116,7 +116,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Create test files with repeated words at known positions for predictable search results. Use WaitForContent to wait for the I-search message before asserting cursor position. Remember that search is incremental — each keystroke triggers a search."
     },
     {

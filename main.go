@@ -304,7 +304,7 @@ func main() {
 					searchMode = false
 					searchHasMatch = false
 					message = ""
-				case term.KeyBackspace, term.KeyBackspace2:
+				case term.KeyBackspace, term.KeyBackspace2, term.KeyCtrlH:
 					// Delete last character from search query
 					if len(searchQuery) > 0 {
 						searchQuery = searchQuery[:len(searchQuery)-1]
@@ -399,7 +399,7 @@ func main() {
 					minibufferInput = nil
 					minibufferCallback = nil
 					message = "Quit"
-				case term.KeyBackspace, term.KeyBackspace2:
+				case term.KeyBackspace, term.KeyBackspace2, term.KeyCtrlH:
 					if len(minibufferInput) > 0 {
 						minibufferInput = minibufferInput[:len(minibufferInput)-1]
 					}
@@ -939,7 +939,7 @@ func main() {
 					buf.SaveUndo()
 					buf.InsertNewline()
 				}
-			case term.KeyBackspace, term.KeyBackspace2:
+			case term.KeyBackspace, term.KeyBackspace2, term.KeyCtrlH:
 				buf.SaveUndo()
 				buf.Backspace()
 			case term.KeyRight:

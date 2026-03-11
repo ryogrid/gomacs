@@ -226,10 +226,15 @@ func main() {
 			}
 		}
 		drawMessageLine(screen, message)
-		screen.ShowCursor(
-			activeWin.StartCol+bufColToVisualCol(activeWin.Buffer.Lines[activeWin.Buffer.CursorR], activeWin.Buffer.CursorC),
-			activeWin.Buffer.CursorR-activeWin.ScrollOffset+activeWin.StartRow,
-		)
+		if minibufferMode {
+			cursorX := len([]rune(minibufferPrompt)) + len(minibufferInput)
+			screen.ShowCursor(cursorX, screenHeight-1)
+		} else {
+			screen.ShowCursor(
+				activeWin.StartCol+bufColToVisualCol(activeWin.Buffer.Lines[activeWin.Buffer.CursorR], activeWin.Buffer.CursorC),
+				activeWin.Buffer.CursorR-activeWin.ScrollOffset+activeWin.StartRow,
+			)
+		}
 		screen.Show()
 	}
 
@@ -399,6 +404,52 @@ func main() {
 						minibufferInput = minibufferInput[:len(minibufferInput)-1]
 					}
 					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyTab:
+					// Tab completion for Find file
+					if minibufferPrompt == "Find file: " {
+						input := string(minibufferInput)
+						dir := "."
+						prefix := input
+						if idx := strings.LastIndex(input, "/"); idx >= 0 {
+							dir = input[:idx]
+							if dir == "" {
+								dir = "/"
+							}
+							prefix = input[idx+1:]
+						}
+						entries, err := os.ReadDir(dir)
+						if err == nil {
+							var matches []string
+							for _, e := range entries {
+								name := e.Name()
+								if strings.HasPrefix(name, prefix) {
+									if e.IsDir() {
+										matches = append(matches, name+"/")
+									} else {
+										matches = append(matches, name)
+									}
+								}
+							}
+							if len(matches) == 1 {
+								if dir == "." {
+									minibufferInput = []rune(matches[0])
+								} else {
+									minibufferInput = []rune(dir + "/" + matches[0])
+								}
+							} else if len(matches) > 1 {
+								common := longestCommonPrefix(matches)
+								if dir == "." {
+									minibufferInput = []rune(common)
+								} else {
+									minibufferInput = []rune(dir + "/" + common)
+								}
+								message = minibufferPrompt + string(minibufferInput) + " [" + strings.Join(matches, " ") + "]"
+								redraw()
+								continue
+							}
+						}
+						message = minibufferPrompt + string(minibufferInput)
+					}
 				case term.KeyRune:
 					minibufferInput = append(minibufferInput, ev.Rune())
 					message = minibufferPrompt + string(minibufferInput)
@@ -869,8 +920,30 @@ func main() {
 				buf.SaveUndo()
 				buf.DeleteChar()
 			case term.KeyEnter:
-				buf.SaveUndo()
-				buf.InsertNewline()
+				if buf.Filename == "*Buffer List*" {
+					// Switch to the buffer on the current line
+					if buf.CursorR < len(buf.Lines) {
+						line := strings.TrimSpace(string(buf.Lines[buf.CursorR]))
+						fields := strings.Fields(line)
+						if len(fields) >= 4 {
+							targetName := fields[len(fields)-1]
+							for i, b := range buffers {
+								if b.Filename == targetName && b.Filename != "*Buffer List*" {
+									previousBufferIdx = activeBufferIdx
+									activeBufferIdx = i
+									buf = buffers[activeBufferIdx]
+									activeWin.Buffer = buf
+									activeWin.ScrollOffset = 0
+									message = fmt.Sprintf("Switch to buffer: %s", targetName)
+									break
+								}
+							}
+						}
+					}
+				} else {
+					buf.SaveUndo()
+					buf.InsertNewline()
+				}
 			case term.KeyBackspace, term.KeyBackspace2:
 				buf.SaveUndo()
 				buf.Backspace()
@@ -1073,4 +1146,18 @@ func drawWindowStatusLine(screen term.Screen, win *Window, active bool) {
 		}
 		screen.SetContent(win.StartCol+col, statusRow, ch, style)
 	}
+}
+
+// longestCommonPrefix returns the longest common prefix of the given strings.
+func longestCommonPrefix(strs []string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	prefix := strs[0]
+	for _, s := range strs[1:] {
+		for len(prefix) > 0 && !strings.HasPrefix(s, prefix) {
+			prefix = prefix[:len(prefix)-1]
+		}
+	}
+	return prefix
 }

@@ -95,3 +95,16 @@
   - For backward search tests, move to end of buffer first with M-> so there's content to search backward through
   - Search cursor position: cursor moves to start of match (e.g., "banana" at col 6 on row 0)
 ---
+
+## 2026-03-11 - US-007
+- Implemented kill, yank, and undo E2E tests in e2e/killyank_test.go
+- Tests: KillLine, Yank, KillRegion, CopyRegion, Undo, ConsecutiveKillAccumulation
+- Files changed: e2e/killyank_test.go (new)
+- **Learnings for future iterations:**
+  - C-k kills from cursor to end of line; at end of line it kills the newline (joins lines)
+  - Consecutive C-k calls accumulate killed text in the same kill ring entry (via appendKill/lastKill)
+  - C-Space sets mark (tmux key: "C-Space"), then move cursor, then C-w to kill region
+  - M-w (copy region) copies without deleting; send as "Escape" then "w" with 50ms gap
+  - C-_ triggers undo; message line shows "Undo" on success
+  - For region tests, use C-a to go to beginning, C-Space to set mark, C-f repeated to select chars
+---

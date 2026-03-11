@@ -135,7 +135,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "For C-SPC, send 'C-Space' to tmux. For C-_, send 'C-_'. For M-w, send 'Escape w'. The kill ring accumulation test is important — it verifies that consecutive C-k calls without intervening non-kill commands join the killed text."
     },
     {

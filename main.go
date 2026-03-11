@@ -299,7 +299,7 @@ func main() {
 					searchMode = false
 					searchHasMatch = false
 					message = "Quit"
-				case term.KeyEnter:
+				case term.KeyEnter, term.KeyCtrlJ:
 					// Accept search result, exit search mode
 					searchMode = false
 					searchHasMatch = false
@@ -384,7 +384,7 @@ func main() {
 			// Handle minibuffer input mode
 			if minibufferMode {
 				switch ev.Key() {
-				case term.KeyEnter:
+				case term.KeyEnter, term.KeyCtrlJ:
 					input := string(minibufferInput)
 					cb := minibufferCallback
 					minibufferMode = false
@@ -920,7 +920,7 @@ func main() {
 			case term.KeyCtrlD:
 				buf.SaveUndo()
 				buf.DeleteChar()
-			case term.KeyEnter:
+			case term.KeyEnter, term.KeyCtrlJ:
 				if buf.Filename == "*Buffer List*" {
 					// Line index maps directly to buffers index.
 					targetIdx := buf.CursorR

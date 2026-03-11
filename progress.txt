@@ -14,6 +14,7 @@
 - recalcWindows(windows, screenHeight) distributes height evenly, reserves 1 row for message line
 - C-x 2 splits vertically (top/bottom), C-x 3 splits horizontally (side-by-side), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
 
+- CaptureWithEscapes() on Harness captures tmux pane with ANSI escapes preserved (-e flag)
 - e2e/ directory contains E2E tests; harness.go provides Harness struct for tmux-based testing
 - Harness.Start() creates detached tmux session, Harness.SendKeys() sends keys, Harness.Capture() returns screen rows
 - Session names are sanitized (/ . : replaced with -) and have random suffix for parallel test support
@@ -135,4 +136,17 @@
   - C-x o cycles activeWindowIdx; screen changes because active/inactive status bar rendering swaps
   - After C-x 0, if activeWindowIdx >= len(windows) it wraps to len-1
   - After C-x 1, only the active window survives; splitMode resets to "vertical"
+---
+
+## 2026-03-11 - US-010
+- Implemented syntax highlighting smoke test in e2e/highlight_test.go
+- Added CaptureWithEscapes() method to Harness in e2e/harness.go
+- Tests: GoFileHighlighting, TxtFileNoHighlighting
+- Files changed: e2e/harness.go (modified), e2e/highlight_test.go (new)
+- **Learnings for future iterations:**
+  - tmux capture-pane -e preserves ANSI escapes; without -e they are stripped
+  - The terminal renderer always emits default foreground color escapes (e.g., \x1b[38;5;231m for white) even for unstyled text
+  - To detect syntax highlighting, check for *multiple distinct* foreground colors rather than presence/absence of ANSI escapes
+  - Regex `\x1b\[38;5;(\d+)m` extracts 256-color foreground values for comparison
+  - Monokai theme on .go files produces multiple distinct colors for keywords, strings, etc.
 ---

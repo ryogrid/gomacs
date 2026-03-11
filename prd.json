@@ -187,7 +187,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "The key insight is that tmux capture-pane normally strips ANSI escapes, but with -e flag it preserves them. A .go file should have color escapes from Chroma syntax highlighting; a .txt file should not. Only check content rows (0 to height-3), not the status bar or message line which always have escapes."
     }
   ]

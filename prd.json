@@ -58,7 +58,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "The binary path must be a package-level var so all tests can access it. TestMain uses os.Exit(m.Run()) pattern. The smoke test validates the entire harness pipeline works end-to-end. Build the binary from the repo root (parent of e2e/), so use 'go build -o <path> ..' or set the working directory."
     },
     {

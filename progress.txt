@@ -40,4 +40,19 @@
   - AssertScreenSnapshot auto-creates golden file if missing or UPDATE_GOLDEN=1
   - CursorPosition helper returns (row, col) for use in custom assertions beyond AssertCursorAt
   - tmux display-message -p "#{cursor_x} #{cursor_y}" returns x (col) first, then y (row)
+- e2e/e2e_test.go has TestMain (builds binary, checks for tmux), newHarness(), createTestFile() helpers
+- gomacsPath is a package-level var set by TestMain — all tests use newHarness(t, args...) to get a Harness
+- Build binary from e2e/ dir using `go build -o <path> ..` (parent dir)
+---
+
+## 2026-03-11 - US-003
+- Implemented TestMain, newHarness, createTestFile helpers, and TestSmokeTest in e2e/e2e_test.go
+- Files changed: e2e/e2e_test.go (new)
+- **Learnings for future iterations:**
+  - TestMain builds binary once with `go build -o <tmpdir>/goomacs ..` from e2e/ directory
+  - TestMain checks for tmux with exec.LookPath and exits 0 (skip) if not found
+  - newHarness(t, args...) wraps Start() with the pre-built binary path
+  - createTestFile(t, name, content) uses t.TempDir() for automatic cleanup
+  - Smoke test: wait for *scratch*, send C-x then C-c with 50ms gap, verify session gone
+  - tmux has-session -t <session> returns error when session doesn't exist
 ---

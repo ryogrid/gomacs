@@ -41,7 +41,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "All assertion methods should call t.Helper() for correct line reporting. AssertScreenSnapshot should use os.ReadFile/os.WriteFile for golden files. Row indices are 0-based. The Harness knows its height (24) so status bar is at row 22 and message line is at row 23."
     },
     {

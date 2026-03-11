@@ -17,6 +17,8 @@
 - e2e/ directory contains E2E tests; harness.go provides Harness struct for tmux-based testing
 - Harness.Start() creates detached tmux session, Harness.SendKeys() sends keys, Harness.Capture() returns screen rows
 - Session names are sanitized (/ . : replaced with -) and have random suffix for parallel test support
+- e2e/assertions.go has AssertLineContains, AssertLineEquals, AssertStatusBar (row 22), AssertMessageLine (row 23), AssertScreenContains, AssertScreenSnapshot, AssertCursorAt
+- Golden files go in e2e/testdata/<name>.golden; auto-created if missing or UPDATE_GOLDEN=1
 
 ## Progress: E2E Testing Framework
 
@@ -28,4 +30,14 @@
   - 200ms sleep after Start() is needed for goomacs to initialize
   - tmux capture-pane -p outputs lines with possible trailing newline; trim to height
   - Harness uses t.Cleanup for automatic session teardown
+---
+
+## 2026-03-11 - US-002
+- Implemented assertion helpers in e2e/assertions.go and created e2e/testdata/ directory
+- Files changed: e2e/assertions.go (new), e2e/testdata/.gitkeep (new)
+- **Learnings for future iterations:**
+  - AssertStatusBar checks row height-2 (index 22), AssertMessageLine checks row height-1 (index 23)
+  - AssertScreenSnapshot auto-creates golden file if missing or UPDATE_GOLDEN=1
+  - CursorPosition helper returns (row, col) for use in custom assertions beyond AssertCursorAt
+  - tmux display-message -p "#{cursor_x} #{cursor_y}" returns x (col) first, then y (row)
 ---

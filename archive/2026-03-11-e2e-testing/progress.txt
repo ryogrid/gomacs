@@ -1,0 +1,152 @@
+## Codebase Patterns
+- Module name is `goomacs`, so term package imports as `goomacs/term`
+- main.go uses term.Screen interface with term.KeyEvent, term.ResizeEvent, term.Style types
+- Buffer struct holds Lines, CursorR/C, ScrollOffset, Modified, Filename, KillRing, Mark, UndoStack
+- Event loop in main.go: PollEvent → dispatch by mode (search/C-x prefix/normal) → redraw
+- cell struct in terminal.go: {ch rune, style Style} — used for diff-based rendering in Show()
+- Style is now a struct (fg Color, bg Color, reverse bool, bold bool); StyleDefault is a var, not const
+- writeStyledCell() on Terminal emits combined ANSI sequence
+- Highlighter in highlight.go: NewHighlighter(filename) → nil if no lexer; Highlight(lines) caches [][]term.Style; StyleAt(row,col) returns cached style
+- drawWindowContent(screen, win, sh) renders buffer content in window's row range
+- Tab expansion handled in rendering (bufColToVisualCol)
+- `buf` is a local alias for `buffers[activeBufferIdx]`
+- Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
+- recalcWindows(windows, screenHeight) distributes height evenly, reserves 1 row for message line
+- C-x 2 splits vertically (top/bottom), C-x 3 splits horizontally (side-by-side), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
+
+- CaptureWithEscapes() on Harness captures tmux pane with ANSI escapes preserved (-e flag)
+- e2e/ directory contains E2E tests; harness.go provides Harness struct for tmux-based testing
+- Harness.Start() creates detached tmux session, Harness.SendKeys() sends keys, Harness.Capture() returns screen rows
+- Session names are sanitized (/ . : replaced with -) and have random suffix for parallel test support
+- e2e/assertions.go has AssertLineContains, AssertLineEquals, AssertStatusBar (row 22), AssertMessageLine (row 23), AssertScreenContains, AssertScreenSnapshot, AssertCursorAt
+- Golden files go in e2e/testdata/<name>.golden; auto-created if missing or UPDATE_GOLDEN=1
+
+## Progress: E2E Testing Framework
+
+## 2026-03-11 - US-001
+- Implemented tmux test harness core in e2e/harness.go
+- Files changed: e2e/harness.go (new)
+- **Learnings for future iterations:**
+  - tmux session names cannot contain `.` `/` `:` — sanitize t.Name() before using
+  - 200ms sleep after Start() is needed for goomacs to initialize
+  - tmux capture-pane -p outputs lines with possible trailing newline; trim to height
+  - Harness uses t.Cleanup for automatic session teardown
+---
+
+## 2026-03-11 - US-002
+- Implemented assertion helpers in e2e/assertions.go and created e2e/testdata/ directory
+- Files changed: e2e/assertions.go (new), e2e/testdata/.gitkeep (new)
+- **Learnings for future iterations:**
+  - AssertStatusBar checks row height-2 (index 22), AssertMessageLine checks row height-1 (index 23)
+  - AssertScreenSnapshot auto-creates golden file if missing or UPDATE_GOLDEN=1
+  - CursorPosition helper returns (row, col) for use in custom assertions beyond AssertCursorAt
+  - tmux display-message -p "#{cursor_x} #{cursor_y}" returns x (col) first, then y (row)
+- e2e/e2e_test.go has TestMain (builds binary, checks for tmux), newHarness(), createTestFile() helpers
+- gomacsPath is a package-level var set by TestMain — all tests use newHarness(t, args...) to get a Harness
+- Build binary from e2e/ dir using `go build -o <path> ..` (parent dir)
+---
+
+## 2026-03-11 - US-003
+- Implemented TestMain, newHarness, createTestFile helpers, and TestSmokeTest in e2e/e2e_test.go
+- Files changed: e2e/e2e_test.go (new)
+- **Learnings for future iterations:**
+  - TestMain builds binary once with `go build -o <tmpdir>/goomacs ..` from e2e/ directory
+  - TestMain checks for tmux with exec.LookPath and exits 0 (skip) if not found
+  - newHarness(t, args...) wraps Start() with the pre-built binary path
+  - createTestFile(t, name, content) uses t.TempDir() for automatic cleanup
+  - Smoke test: wait for *scratch*, send C-x then C-c with 50ms gap, verify session gone
+  - tmux has-session -t <session> returns error when session doesn't exist
+---
+
+## 2026-03-11 - US-004
+- Implemented basic editing E2E tests in e2e/basic_test.go
+- Tests: ScratchBuffer, TextInsertion, Backspace, DeleteForward, Newline, Save, Quit
+- Files changed: e2e/basic_test.go (new)
+- **Learnings for future iterations:**
+  - C-x C-s save: use 50ms gap between C-x and C-s, then 500ms wait for disk write
+  - Quit with unmodified buffer exits immediately (no confirmation needed)
+  - For backspace test, verify both that shortened text exists AND full text is gone
+  - createTestFile with empty content works for save tests — open file, type, save, verify on disk
+  - All subtests use t.Run for organization within a test group
+---
+
+## 2026-03-11 - US-005
+- Implemented navigation E2E tests in e2e/navigation_test.go
+- Tests: ForwardBackward (C-f/C-b), DownUp (C-n/C-p), BeginningEndOfLine (C-a/C-e), PageDownUp (C-v/M-v), BeginningEndOfBuffer (M-</M->), GotoLine (C-l)
+- Files changed: e2e/navigation_test.go (new)
+- **Learnings for future iterations:**
+  - Meta/Alt keys sent via tmux as `Escape` then key with 50ms gap (e.g., `Escape` then `>` for M->)
+  - C-l opens "Goto line:" minibuffer prompt; type number then Enter
+  - Status bar shows `Line X/Y, Col Z` (1-based) — use `AssertStatusBar(t, "Line 10/")` to verify goto-line
+  - For scroll tests (C-v/M-v), check that top line content changed rather than exact cursor position
+  - 300ms sleep after scroll/jump commands gives enough time for screen redraw
+---
+
+## 2026-03-11 - US-006
+- Implemented search E2E tests in e2e/search_test.go
+- Tests: ForwardSearch, SearchNext, BackwardSearch, SearchAccept, SearchCancel, SearchBackspace
+- Files changed: e2e/search_test.go (new)
+- **Learnings for future iterations:**
+  - C-s enters forward search mode; message line shows "I-search: <query>"
+  - C-r enters backward search mode; message line shows "I-search backward: <query>"
+  - C-s C-s (during search) advances to next match; cursor position changes
+  - Enter accepts search (cursor stays at match, message clears)
+  - C-g cancels search (cursor returns to original position)
+  - BSpace during search removes last query char; message line updates accordingly
+  - For backward search tests, move to end of buffer first with M-> so there's content to search backward through
+  - Search cursor position: cursor moves to start of match (e.g., "banana" at col 6 on row 0)
+---
+
+## 2026-03-11 - US-007
+- Implemented kill, yank, and undo E2E tests in e2e/killyank_test.go
+- Tests: KillLine, Yank, KillRegion, CopyRegion, Undo, ConsecutiveKillAccumulation
+- Files changed: e2e/killyank_test.go (new)
+- **Learnings for future iterations:**
+  - C-k kills from cursor to end of line; at end of line it kills the newline (joins lines)
+  - Consecutive C-k calls accumulate killed text in the same kill ring entry (via appendKill/lastKill)
+  - C-Space sets mark (tmux key: "C-Space"), then move cursor, then C-w to kill region
+  - M-w (copy region) copies without deleting; send as "Escape" then "w" with 50ms gap
+  - C-_ triggers undo; message line shows "Undo" on success
+  - For region tests, use C-a to go to beginning, C-Space to set mark, C-f repeated to select chars
+---
+
+## 2026-03-11 - US-008
+- Implemented buffer management E2E tests in e2e/buffer_test.go
+- Tests: OpenFile (C-x C-f), SwitchBuffer (C-x b), BufferList (C-x C-b), KillBuffer (C-x k), TabCompletion
+- Files changed: e2e/buffer_test.go (new)
+- **Learnings for future iterations:**
+  - C-x C-f opens "Find file:" minibuffer; type full path then Enter to open
+  - C-x b opens "Switch to buffer:" minibuffer; type buffer name (full path) then Enter
+  - C-x C-b shows *Buffer List* buffer with all open buffer names
+  - C-x k prompts for buffer to kill; Enter kills current buffer (default)
+  - Tab completion only works in "Find file:" prompt; single match completes fully, multiple matches show common prefix + options in message line
+  - For tab completion tests, create files with unique shared prefix in a temp dir for deterministic results
+  - Buffer names in C-x b use the full file path as stored in Filename field
+---
+
+## 2026-03-11 - US-009
+- Implemented window splitting E2E tests in e2e/window_test.go
+- Tests: VerticalSplit (C-x 2), HorizontalSplit (C-x 3), SwitchWindow (C-x o), CloseWindow (C-x 0), CloseOtherWindows (C-x 1)
+- Files changed: e2e/window_test.go (new)
+- **Learnings for future iterations:**
+  - Active window status bar: reverse video with space fill; inactive: default style with '-' fill char
+  - Horizontal split (C-x 3) draws '│' (U+2502) separator between side-by-side windows
+  - To detect status bars in capture: look for lines containing "Line " (position indicator) with many dashes or spaces
+  - Cannot mix split modes: vertical split blocked while in horizontal mode and vice versa
+  - C-x o cycles activeWindowIdx; screen changes because active/inactive status bar rendering swaps
+  - After C-x 0, if activeWindowIdx >= len(windows) it wraps to len-1
+  - After C-x 1, only the active window survives; splitMode resets to "vertical"
+---
+
+## 2026-03-11 - US-010
+- Implemented syntax highlighting smoke test in e2e/highlight_test.go
+- Added CaptureWithEscapes() method to Harness in e2e/harness.go
+- Tests: GoFileHighlighting, TxtFileNoHighlighting
+- Files changed: e2e/harness.go (modified), e2e/highlight_test.go (new)
+- **Learnings for future iterations:**
+  - tmux capture-pane -e preserves ANSI escapes; without -e they are stripped
+  - The terminal renderer always emits default foreground color escapes (e.g., \x1b[38;5;231m for white) even for unstyled text
+  - To detect syntax highlighting, check for *multiple distinct* foreground colors rather than presence/absence of ANSI escapes
+  - Regex `\x1b\[38;5;(\d+)m` extracts 256-color foreground values for comparison
+  - Monokai theme on .go files produces multiple distinct colors for keywords, strings, etc.
+---

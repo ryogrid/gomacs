@@ -1,194 +1,116 @@
 {
   "project": "goomacs",
-  "branchName": "ralph/e2e-testing",
-  "description": "End-to-End Testing Framework - tmux-based PTY emulation for testing goomacs with real terminal interaction",
+  "branchName": "ralph/command-palette-and-comment-region",
+  "description": "Alt+X Command Palette and Comment/Uncomment Region - Emacs-style M-x command prompt with tab completion, plus comment-region and uncomment-region commands with language detection via go-enry",
   "userStories": [
     {
       "id": "US-001",
-      "title": "tmux test harness core",
-      "description": "As a developer, I want a Go test helper that manages a tmux session so that I can write E2E tests that send keys and capture screen output.",
+      "title": "Command registry infrastructure",
+      "description": "As a developer, I need a command registry so that named commands can be registered and looked up programmatically.",
       "acceptanceCriteria": [
-        "Create e2e/harness.go with a Harness struct containing fields: session (string), binary (string), width/height (int)",
-        "Start(t *testing.T, binary string, args ...string) creates a detached tmux session with 'tmux new-session -d -s <session> -x 80 -y 24 <binary> <args>'",
-        "Session name is unique per test using t.Name() + random suffix to allow parallel execution",
-        "SendKeys(keys string) calls 'tmux send-keys -t <session> <keys>' via exec.Command",
-        "Capture() []string calls 'tmux capture-pane -t <session> -p' and returns screen as slice of strings (one per row)",
-        "CapturePane() string returns full screen as single string (rows joined by newlines)",
-        "Close() kills the tmux session with 'tmux kill-session -t <session>' — registered via t.Cleanup so it runs even on test failure",
-        "WaitForContent(substr string, timeout time.Duration) error polls Capture() every 100ms until substr appears or timeout expires",
-        "go build ./e2e/... succeeds",
-        "go vet ./e2e/... passes"
+        "Create command.go with a Command struct containing Name (string) and Fn (func(*Buffer, *string)) fields",
+        "A package-level var 'commands []Command' holds all registered commands",
+        "RegisterCommand(name string, fn func(*Buffer, *string)) appends to the commands slice",
+        "FindCommand(name string) returns *Command matching the exact name, or nil if not found",
+        "FindCommandsByPrefix(prefix string) returns []Command whose names start with the given prefix",
+        "Typecheck passes (go vet ./...)"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "This is the foundation. Create the e2e/ directory and harness.go. Use os/exec to run tmux commands. The Harness should take *testing.T so it can call t.Helper(), t.Cleanup(), and t.Fatal(). Use a 200ms sleep after Start() to let goomacs initialize before sending keys."
+      "passes": false,
+      "notes": "This is pure infrastructure with no UI. The Fn signature func(*Buffer, *string) gives the handler access to the active buffer and a pointer to the message string for status feedback. Do not register any commands yet — that happens in later stories."
     },
     {
       "id": "US-002",
-      "title": "Assertion helpers and golden file support",
-      "description": "As a developer, I want assertion helpers for screen content so that I can write readable E2E tests.",
+      "title": "M-x prompt activation and command execution",
+      "description": "As a user, I want to press Alt+X to open a command input prompt so that I can type a command name to execute.",
       "acceptanceCriteria": [
-        "Create e2e/assertions.go with methods on *Harness",
-        "AssertLineContains(t, row int, substr string) captures screen and checks row contains substr, fails with 'line %d: expected to contain %q, got %q'",
-        "AssertLineEquals(t, row int, expected string) checks exact match with trailing whitespace trimmed",
-        "AssertStatusBar(t, substr string) checks second-to-last row (row height-2) contains substr",
-        "AssertMessageLine(t, substr string) checks last row (row height-1) contains substr",
-        "AssertScreenContains(t, substr string) checks substr appears anywhere in full screen capture",
-        "AssertScreenSnapshot(t, name string) compares full screen against e2e/testdata/<name>.golden; writes golden file if UPDATE_GOLDEN=1 env var is set or file doesn't exist",
-        "AssertCursorAt(t, row, col int) verifies cursor position using 'tmux display-message -t <session> -p #{cursor_x} #{cursor_y}'",
-        "Create e2e/testdata/ directory",
-        "go build ./e2e/... succeeds",
-        "go vet ./e2e/... passes"
+        "In the Alt+key section of main.go event loop, handle ev.Rune() == 'x' to enter minibuffer mode",
+        "Minibuffer prompt is set to 'M-x ' and minibufferInput is cleared",
+        "On Enter, the typed input is looked up via FindCommand; if found, the command's Fn is called with the active buffer and &message",
+        "On Enter with an unrecognized command, message is set to 'Unknown command: <input>'",
+        "Escape and C-g cancel the prompt without executing anything",
+        "Typecheck passes (go vet ./...)"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "All assertion methods should call t.Helper() for correct line reporting. AssertScreenSnapshot should use os.ReadFile/os.WriteFile for golden files. Row indices are 0-based. The Harness knows its height (24) so status bar is at row 22 and message line is at row 23."
+      "passes": false,
+      "notes": "Reuse the existing minibuffer infrastructure (minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback). The callback should look up the command and invoke it. The 'x' case goes in the Alt key handling block around line 983-994 in main.go, alongside existing M-v, M-w, M-<, M-> handlers."
     },
     {
       "id": "US-003",
-      "title": "Test infrastructure and TestMain",
-      "description": "As a developer, I want test infrastructure that builds the binary once and skips tests when tmux is unavailable.",
+      "title": "Tab completion for M-x commands",
+      "description": "As a user, I want tab completion in the M-x prompt so that I can quickly find commands without typing the full name.",
       "acceptanceCriteria": [
-        "Create e2e/e2e_test.go with TestMain that builds goomacs binary via 'go build -o <tmpdir>/goomacs .' and stores path in package-level var",
-        "TestMain checks for tmux in PATH using exec.LookPath; if not found, prints 'skipping e2e tests: tmux not found' and exits with 0",
-        "TestMain creates a temp directory for the binary and cleans it up after tests",
-        "Provide a helper function newHarness(t *testing.T, args ...string) *Harness that creates a Harness with the built binary path",
-        "Provide a helper function createTestFile(t *testing.T, name string, content string) string that writes content to t.TempDir()/name and returns the path",
-        "go test ./e2e/ -v -run TestSmokeTest passes (add a minimal TestSmokeTest that starts goomacs, waits for *scratch* in status bar, then quits with C-x C-c)",
-        "go vet ./e2e/... passes"
+        "In the minibuffer Tab handler (main.go ~line 416), add a case for minibufferPrompt == 'M-x '",
+        "Tab calls FindCommandsByPrefix with current input to get matching commands",
+        "If exactly one match, minibufferInput is replaced with the full command name",
+        "If multiple matches, the message line displays the list of matching command names (space-separated)",
+        "If no matches, nothing changes (no crash, no input modification)",
+        "If input is empty, all commands are displayed in the message line",
+        "Typecheck passes (go vet ./...)"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "The binary path must be a package-level var so all tests can access it. TestMain uses os.Exit(m.Run()) pattern. The smoke test validates the entire harness pipeline works end-to-end. Build the binary from the repo root (parent of e2e/), so use 'go build -o <path> ..' or set the working directory."
+      "passes": false,
+      "notes": "The existing Tab handler in the minibuffer event loop checks minibufferPrompt to decide what to complete. Currently it only handles 'Find file: '. Add an else-if for 'M-x '. Use strings.Join on the command names for the candidate list display."
     },
     {
       "id": "US-004",
-      "title": "Basic editing E2E tests",
-      "description": "As a developer, I want E2E tests covering text insertion, deletion, and file save.",
+      "title": "Language detection and comment style lookup",
+      "description": "As a developer, I need to detect the programming language of the current buffer and look up its comment delimiters.",
       "acceptanceCriteria": [
-        "Create e2e/basic_test.go with test functions in TestBasicEditing group",
-        "Test scratch buffer: open with no args, WaitForContent '*scratch*', AssertStatusBar with '*scratch*'",
-        "Test text insertion: type 'Hello, World!', WaitForContent 'Hello, World!', AssertLineContains(t, 0, 'Hello, World!')",
-        "Test backspace: type 'abc', SendKeys 'BSpace', WaitForContent 'ab', verify line 0 does not contain 'abc'",
-        "Test C-d delete: type 'abc', SendKeys 'C-a C-d', WaitForContent 'bc', AssertLineContains(t, 0, 'bc')",
-        "Test newline: type 'line1', SendKeys 'Enter', type 'line2', WaitForContent 'line2', AssertLineContains(t, 0, 'line1'), AssertLineContains(t, 1, 'line2')",
-        "Test save: create temp file, open it, type text, SendKeys 'C-x C-s', verify file content on disk with os.ReadFile",
-        "Test quit: SendKeys 'C-x C-c', verify tmux session no longer exists (tmux has-session returns error)",
-        "All tests pass with 'go test ./e2e/ -v -run TestBasicEditing'",
-        "go vet ./e2e/... passes"
+        "go-enry/go-enry/v2 is added as a dependency (go get github.com/go-enry/go-enry/v2)",
+        "In command.go, define a CommentStyle struct with fields: LinePrefix (string), BlockStart (string), BlockEnd (string)",
+        "A hardcoded var commentStyles map[string]CommentStyle maps language names (as returned by go-enry) to their comment delimiters",
+        "At least 30 languages are covered: Go, Python, JavaScript, TypeScript, Rust, C, C++, Java, Kotlin, Swift, Ruby, PHP, Shell, Perl, Lua, R, SQL, HTML, XML, CSS, SCSS, Haskell, Common Lisp, Clojure, Scheme, Erlang, Elixir, YAML, TOML, Makefile",
+        "A function detectCommentStyle(filename string, content string) CommentStyle uses enry.GetLanguage(filename, []byte(content)) to detect language, then looks up the comment style in the map",
+        "If the language is not detected or not in the map, the function returns CommentStyle{LinePrefix: '#'} as the default",
+        "Typecheck passes (go vet ./...)"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "For the save test, open goomacs with a temp file path, type some text, save with C-x C-s, then read the file from disk. For quit test, after C-x C-c send a small sleep then check if session exists. Use subtests (t.Run) for organization."
+      "passes": false,
+      "notes": "go-enry returns language names like 'Go', 'Python', 'JavaScript', 'HTML', 'CSS', etc. The map keys must match these exact names. For languages with line comments only (Go, Python, etc.), set LinePrefix and leave BlockStart/BlockEnd empty. For languages with block comments only (HTML, CSS), set BlockStart/BlockEnd and leave LinePrefix empty. Some languages have both (C, Java) — set LinePrefix for the common case. enry.GetLanguage takes (filename string, content []byte) and returns a language name string."
     },
     {
       "id": "US-005",
-      "title": "Navigation E2E tests",
-      "description": "As a developer, I want E2E tests covering cursor movement and scrolling.",
+      "title": "comment-region command",
+      "description": "As a user, I want to comment out a selected region of code so that I can quickly disable a block of code.",
       "acceptanceCriteria": [
-        "Create e2e/navigation_test.go with test functions in TestNavigation group",
-        "Test C-f/C-b: type 'abc', verify cursor at col 3, SendKeys 'C-b', AssertCursorAt col 2, SendKeys 'C-f', AssertCursorAt col 3",
-        "Test C-n/C-p: open file with multiple lines, C-n moves cursor down (verify cursor row increments), C-p moves back up",
-        "Test C-a/C-e: type text on a line, C-e goes to end (verify cursor col), C-a goes to beginning (verify cursor col 0)",
-        "Test C-v/M-v: open file with 50+ lines, C-v scrolls down (verify different content visible), M-v scrolls back up",
-        "Test M-</M->: open file with many lines, 'Escape >' jumps to end, 'Escape <' jumps to beginning",
-        "Test C-l goto-line: open file with 20+ lines, SendKeys 'C-l', type '10', Enter, verify status bar shows line 10 and cursor at row 9",
-        "All tests pass with 'go test ./e2e/ -v -run TestNavigation'",
-        "go vet ./e2e/... passes"
+        "A commentRegion function is implemented and registered as 'comment-region' via RegisterCommand",
+        "If buf.MarkActive is false, sets message to 'No region selected' and returns",
+        "Calls buf.SaveUndo() once before any modifications",
+        "Uses buf.regionBounds() to get startR and endR (start and end rows of the region)",
+        "Calls detectCommentStyle with buf.Filename and buffer content to get the comment style",
+        "For languages with LinePrefix: prepends 'LinePrefix ' (with trailing space) to each line from startR to endR inclusive",
+        "For languages with only BlockStart/BlockEnd: wraps each line individually as 'BlockStart line BlockEnd'",
+        "Sets buf.Modified = true and buf.HighlightDirty = true after modification",
+        "Calls buf.DeactivateMark() after the operation",
+        "Sets message to 'Region commented'",
+        "Typecheck passes (go vet ./...)"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "For M-v, send 'Escape' then 'v' as separate SendKeys calls (or as 'Escape v'). For M-< and M->, use 'Escape <' and 'Escape >'. Create test files with known content using createTestFile helper. For scroll tests, generate a file with numbered lines like 'Line 1', 'Line 2', etc."
+      "passes": false,
+      "notes": "buf.Lines is [][]rune. To prepend a comment prefix, convert the prefix to []rune and prepend it to buf.Lines[row]. buf.regionBounds() returns (startR, startC, endR, endC) — only use startR and endR since commenting operates on full lines. To get buffer content as a string for detectCommentStyle, join all lines with newlines. Remember to call RegisterCommand in an init() function or at package level."
     },
     {
       "id": "US-006",
-      "title": "Search E2E tests",
-      "description": "As a developer, I want E2E tests for incremental search.",
+      "title": "uncomment-region command",
+      "description": "As a user, I want to uncomment a selected region of code so that I can re-enable previously commented code.",
       "acceptanceCriteria": [
-        "Create e2e/search_test.go with test functions in TestSearch group",
-        "Test forward search: open file with known content, C-s then type query, AssertMessageLine contains 'I-search: <query>', verify cursor moved to match",
-        "Test search next: C-s C-s advances to next match (verify cursor position changed)",
-        "Test backward search: C-r then type query, AssertMessageLine contains 'I-search backward: <query>'",
-        "Test search accept: Enter exits search, cursor stays at match, message line clears",
-        "Test search cancel: C-g cancels search, cursor returns to original position",
-        "Test search backspace: type query, BSpace removes last char, message line shows shorter query",
-        "All tests pass with 'go test ./e2e/ -v -run TestSearch'",
-        "go vet ./e2e/... passes"
+        "An uncommentRegion function is implemented and registered as 'uncomment-region' via RegisterCommand",
+        "If buf.MarkActive is false, sets message to 'No region selected' and returns",
+        "Calls buf.SaveUndo() once before any modifications",
+        "Uses buf.regionBounds() to get startR and endR",
+        "Calls detectCommentStyle with buf.Filename and buffer content to get the comment style",
+        "For line comments: removes the first occurrence of 'LinePrefix ' (with space) or 'LinePrefix' (without space) from each line, tolerating leading whitespace before the prefix",
+        "For block comments: removes BlockStart (with optional trailing space) from the beginning and BlockEnd (with optional leading space) from the end of each line",
+        "Lines that do not contain the comment markers are left unchanged",
+        "Sets buf.Modified = true and buf.HighlightDirty = true after modification",
+        "Calls buf.DeactivateMark() after the operation",
+        "Sets message to 'Region uncommented'",
+        "Typecheck passes (go vet ./...)"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Create test files with repeated words at known positions for predictable search results. Use WaitForContent to wait for the I-search message before asserting cursor position. Remember that search is incremental — each keystroke triggers a search."
-    },
-    {
-      "id": "US-007",
-      "title": "Kill, yank, and undo E2E tests",
-      "description": "As a developer, I want E2E tests for kill/yank and undo operations.",
-      "acceptanceCriteria": [
-        "Create e2e/killyank_test.go with test functions in TestKillYankUndo group",
-        "Test C-k kill line: type 'hello world', C-a, C-k, verify line is empty",
-        "Test C-y yank: kill text with C-k, move to new line, C-y, verify killed text appears",
-        "Test C-w kill region: type text, C-a, C-SPC (C-Space), C-f C-f C-f, C-w, verify first 3 chars removed",
-        "Test M-w copy region: set mark, move, 'Escape w', move elsewhere, C-y, verify text pasted without original being deleted",
-        "Test C-_ undo: type 'abc', C-_ (C-Minus or C-/), verify last edit reversed",
-        "Test consecutive kill accumulation: type two lines, go to first line, C-k C-k (kill line + newline), move down, C-y, verify both lines yanked together",
-        "All tests pass with 'go test ./e2e/ -v -run TestKillYankUndo'",
-        "go vet ./e2e/... passes"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "For C-SPC, send 'C-Space' to tmux. For C-_, send 'C-_'. For M-w, send 'Escape w'. The kill ring accumulation test is important — it verifies that consecutive C-k calls without intervening non-kill commands join the killed text."
-    },
-    {
-      "id": "US-008",
-      "title": "Buffer management E2E tests",
-      "description": "As a developer, I want E2E tests for multi-buffer operations.",
-      "acceptanceCriteria": [
-        "Create e2e/buffer_test.go with test functions in TestBufferManagement group",
-        "Test C-x C-f open file: create temp file with known content, C-x C-f type path Enter, WaitForContent with file content, AssertStatusBar with filename",
-        "Test C-x b switch buffer: open two files, C-x b type buffer name Enter, verify status bar shows switched buffer",
-        "Test C-x C-b buffer list: open multiple files, C-x C-b, verify screen shows all buffer names",
-        "Test C-x k kill buffer: open a file, C-x k Enter, verify buffer removed (status bar shows different buffer)",
-        "Test tab completion: create temp dir with files, C-x C-f type partial name Tab, verify minibuffer input completed",
-        "All tests pass with 'go test ./e2e/ -v -run TestBufferManagement'",
-        "go vet ./e2e/... passes"
-      ],
-      "priority": 8,
-      "passes": true,
-      "notes": "For file operations, use createTestFile to create temp files with known content. For tab completion test, create a temp directory with uniquely-named files so the completion is deterministic. Remember C-x C-f is two separate SendKeys: 'C-x' then 'C-f'."
-    },
-    {
-      "id": "US-009",
-      "title": "Window splitting E2E tests",
-      "description": "As a developer, I want E2E tests for window splitting operations.",
-      "acceptanceCriteria": [
-        "Create e2e/window_test.go with test functions in TestWindowSplitting group",
-        "Test C-x 2 vertical split: SendKeys 'C-x 2', verify two status bars visible (scan rows for '==' pattern appearing twice)",
-        "Test C-x 3 horizontal split: SendKeys 'C-x 3', verify vertical separator '│' character appears in capture",
-        "Test C-x o switch window: split, C-x o, verify active window indicator changes (== vs -- markers)",
-        "Test C-x 0 close window: split, C-x 0, verify only one status bar remains",
-        "Test C-x 1 close other windows: split into multiple, C-x 1, verify only one status bar remains",
-        "All tests pass with 'go test ./e2e/ -v -run TestWindowSplitting'",
-        "go vet ./e2e/... passes"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": "For vertical split (C-x 2), count rows that look like status bars (contain '==' or '--'). For horizontal split (C-x 3), check for the Unicode box-drawing character '│' (U+2502). After C-x o, the active/inactive markers swap."
-    },
-    {
-      "id": "US-010",
-      "title": "Syntax highlighting smoke test",
-      "description": "As a developer, I want a basic E2E test that verifies syntax highlighting is active for .go files.",
-      "acceptanceCriteria": [
-        "Create e2e/highlight_test.go with test functions in TestSyntaxHighlighting group",
-        "Test .go file highlighting: create temp .go file with 'package main\\nfunc main() {}', open it, capture pane with ANSI escapes using 'tmux capture-pane -e -t <session> -p', verify output contains ANSI escape sequences (\\033[ or \\x1b[)",
-        "Test .txt file no highlighting: create temp .txt file with plain text, open it, capture with -e flag, verify NO ANSI escape sequences in the content area (status bar will have escapes from reverse video, so only check content rows)",
-        "Add CaptureWithEscapes() method to Harness that calls 'tmux capture-pane -e -t <session> -p' for ANSI-mode capture",
-        "All tests pass with 'go test ./e2e/ -v -run TestSyntaxHighlighting'",
-        "go vet ./e2e/... passes"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": "The key insight is that tmux capture-pane normally strips ANSI escapes, but with -e flag it preserves them. A .go file should have color escapes from Chroma syntax highlighting; a .txt file should not. Only check content rows (0 to height-3), not the status bar or message line which always have escapes."
+      "passes": false,
+      "notes": "For line comment removal, use strings.Index or a manual scan on the string version of each line to find the prefix position. Handle both '// code' (prefix+space) and '//code' (prefix only). For whitespace tolerance, trim leading whitespace to find the prefix, but preserve the indentation structure (only remove the prefix itself, not the indentation). buf.Lines[row] is []rune — convert to string for matching, then back to []rune after modification."
     }
   ]
 }

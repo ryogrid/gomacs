@@ -539,7 +539,7 @@ func main() {
 						if name == "" {
 							name = "[No Name]"
 						}
-						lines = append(lines, fmt.Sprintf("%s %s %-20s %s", marker, modFlag, name, name))
+						lines = append(lines, fmt.Sprintf("%s%s %s", marker, modFlag, name))
 					}
 					content := ""
 					for i, l := range lines {
@@ -921,23 +921,17 @@ func main() {
 				buf.DeleteChar()
 			case term.KeyEnter:
 				if buf.Filename == "*Buffer List*" {
-					// Switch to the buffer on the current line
-					if buf.CursorR < len(buf.Lines) {
-						line := strings.TrimSpace(string(buf.Lines[buf.CursorR]))
-						fields := strings.Fields(line)
-						if len(fields) >= 4 {
-							targetName := fields[len(fields)-1]
-							for i, b := range buffers {
-								if b.Filename == targetName && b.Filename != "*Buffer List*" {
-									previousBufferIdx = activeBufferIdx
-									activeBufferIdx = i
-									buf = buffers[activeBufferIdx]
-									activeWin.Buffer = buf
-									activeWin.ScrollOffset = 0
-									message = fmt.Sprintf("Switch to buffer: %s", targetName)
-									break
-								}
-							}
+					// Line index maps directly to buffers index.
+					targetIdx := buf.CursorR
+					if targetIdx >= 0 && targetIdx < len(buffers) {
+						target := buffers[targetIdx]
+						if target.Filename != "*Buffer List*" {
+							previousBufferIdx = activeBufferIdx
+							activeBufferIdx = targetIdx
+							buf = buffers[activeBufferIdx]
+							activeWin.Buffer = buf
+							activeWin.ScrollOffset = 0
+							message = fmt.Sprintf("Switch to buffer: %s", target.Filename)
 						}
 					}
 				} else {

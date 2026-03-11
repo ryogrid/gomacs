@@ -31,7 +31,7 @@
         "go test ./... passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Simple change: add term.KeyCtrlJ to every existing 'case term.KeyEnter:' in main.go. There are three locations: search mode handler, minibuffer mode handler, and normal mode handler. Confirm mode already only responds to KeyRune 'y'/'n', so no change needed there."
     },
     {

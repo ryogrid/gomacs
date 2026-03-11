@@ -24,3 +24,12 @@
   - Three mode handlers have parallel structure for key dispatch: search mode → minibuffer mode → confirm mode → normal mode
   - Adding a new key alternative to an existing action is just appending to the case list
 ---
+
+## 2026-03-11 - US-002
+- Added term.KeyCtrlJ to all three KeyEnter case statements in main.go (search mode, minibuffer mode, normal mode)
+- Confirm mode was verified to be unaffected — it only checks ev.Key() == term.KeyRune for 'y'/'n'
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - The Edit tool can struggle with tab-indented Go code; using sed for simple substitutions is more reliable
+  - Confirm mode is safe from new key additions since it gates on KeyRune before checking the rune value
+---

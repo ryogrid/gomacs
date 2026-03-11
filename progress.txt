@@ -68,3 +68,15 @@
   - createTestFile with empty content works for save tests — open file, type, save, verify on disk
   - All subtests use t.Run for organization within a test group
 ---
+
+## 2026-03-11 - US-005
+- Implemented navigation E2E tests in e2e/navigation_test.go
+- Tests: ForwardBackward (C-f/C-b), DownUp (C-n/C-p), BeginningEndOfLine (C-a/C-e), PageDownUp (C-v/M-v), BeginningEndOfBuffer (M-</M->), GotoLine (C-l)
+- Files changed: e2e/navigation_test.go (new)
+- **Learnings for future iterations:**
+  - Meta/Alt keys sent via tmux as `Escape` then key with 50ms gap (e.g., `Escape` then `>` for M->)
+  - C-l opens "Goto line:" minibuffer prompt; type number then Enter
+  - Status bar shows `Line X/Y, Col Z` (1-based) — use `AssertStatusBar(t, "Line 10/")` to verify goto-line
+  - For scroll tests (C-v/M-v), check that top line content changed rather than exact cursor position
+  - 300ms sleep after scroll/jump commands gives enough time for screen redraw
+---

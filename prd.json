@@ -97,7 +97,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "For M-v, send 'Escape' then 'v' as separate SendKeys calls (or as 'Escape v'). For M-< and M->, use 'Escape <' and 'Escape >'. Create test files with known content using createTestFile helper. For scroll tests, generate a file with numbered lines like 'Line 1', 'Line 2', etc."
     },
     {

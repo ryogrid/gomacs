@@ -18,6 +18,8 @@ goomacs provides a familiar Emacs keybinding experience for quick file editing w
 - **Multiple buffers** -- Open and switch between multiple files (C-x b, C-x C-f, C-x C-b)
 - **Window splitting** -- Split the screen vertically (C-x 2) or horizontally side-by-side (C-x 3) to view multiple buffers at once
 - **Syntax highlighting** -- Automatic syntax coloring for source code files using Chroma (monokai theme, 256-color)
+- **Tab completion** -- Filename completion in find-file prompt (Tab key)
+- **Goto line** -- Jump to any line by number (C-l)
 - **Minimal dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences
 
 ## Installation
@@ -118,6 +120,18 @@ goomacs/
 │   ├── screen.go        # Screen interface, Event types, Style, KeyCode constants
 │   ├── terminal.go      # Terminal implementation (raw mode, ANSI rendering, input parsing)
 │   └── terminal_test.go # Terminal backend tests (26 tests)
+├── e2e/                 # End-to-end tests (tmux-based)
+│   ├── harness.go       # tmux session management and screen capture
+│   ├── assertions.go    # Screen assertion helpers and golden file support
+│   ├── e2e_test.go      # TestMain, test helpers, smoke test
+│   ├── basic_test.go    # Basic editing tests
+│   ├── navigation_test.go # Cursor movement and scrolling tests
+│   ├── search_test.go   # Incremental search tests
+│   ├── killyank_test.go # Kill, yank, and undo tests
+│   ├── buffer_test.go   # Buffer management tests
+│   ├── window_test.go   # Window splitting tests
+│   ├── highlight_test.go # Syntax highlighting smoke tests
+│   └── testdata/        # Golden files for snapshot assertions
 └── impl_docs/           # Implementation documentation
     ├── architecture.md  # Architecture overview with diagrams
     ├── buffer.md        # Buffer data structure documentation
@@ -133,8 +147,38 @@ All terminal handling uses only the Go standard library (`syscall`, `os`, `bufio
 
 ## Testing
 
+### Unit Tests
+
 ```bash
 go test ./...
+```
+
+### End-to-End Tests
+
+E2E tests use [tmux](https://github.com/tmux/tmux) to spawn goomacs in a pseudo-terminal, send keystrokes, and verify screen output. This catches rendering and interaction bugs that unit tests cannot.
+
+**Prerequisites:**
+
+```bash
+# Install tmux (Ubuntu/Debian)
+sudo apt-get install -y tmux
+
+# Or on macOS
+brew install tmux
+```
+
+**Run E2E tests:**
+
+```bash
+go test ./e2e/ -v -timeout 120s
+```
+
+The tests automatically build the goomacs binary before running. If tmux is not installed, the tests are skipped.
+
+**Update golden files** (snapshot assertions):
+
+```bash
+UPDATE_GOLDEN=1 go test ./e2e/ -v -timeout 120s
 ```
 
 ## License

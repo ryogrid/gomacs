@@ -1,0 +1,46 @@
+## Codebase Patterns
+- Module name is `goomacs`, so term package imports as `goomacs/term`
+- main.go uses term.Screen interface with term.KeyEvent, term.ResizeEvent, term.Style types
+- Buffer struct holds Lines, CursorR/C, ScrollOffset, Modified, Filename, KillRing, Mark, UndoStack
+- Event loop in main.go: PollEvent → dispatch by mode (search/C-x prefix/normal) → redraw
+- cell struct in terminal.go: {ch rune, style Style} — used for diff-based rendering in Show()
+- Style is now a struct (fg Color, bg Color, reverse bool, bold bool); StyleDefault is a var, not const
+- writeStyledCell() on Terminal emits combined ANSI sequence
+- Highlighter in highlight.go: NewHighlighter(filename) → nil if no lexer; Highlight(lines) caches [][]term.Style; StyleAt(row,col) returns cached style
+- drawWindowContent(screen, win, sh) renders buffer content in window's row range
+- Tab expansion handled in rendering (bufColToVisualCol)
+- `buf` is a local alias for `buffers[activeBufferIdx]`
+- Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
+- recalcWindows(windows, screenHeight) distributes height evenly, reserves 1 row for message line
+- C-x 2 splits vertically (top/bottom), C-x 3 splits horizontally (side-by-side), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
+
+## Progress: Ctrl Key Bindings
+
+## 2026-03-11 - US-001
+- Added term.KeyCtrlH to all three Backspace case statements in main.go (search mode, minibuffer mode, normal mode)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - main.go uses tabs for indentation — the Edit tool needs exact tab characters to match
+  - Three mode handlers have parallel structure for key dispatch: search mode → minibuffer mode → confirm mode → normal mode
+  - Adding a new key alternative to an existing action is just appending to the case list
+---
+
+## 2026-03-11 - US-002
+- Added term.KeyCtrlJ to all three KeyEnter case statements in main.go (search mode, minibuffer mode, normal mode)
+- Confirm mode was verified to be unaffected — it only checks ev.Key() == term.KeyRune for 'y'/'n'
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - The Edit tool can struggle with tab-indented Go code; using sed for simple substitutions is more reliable
+  - Confirm mode is safe from new key additions since it gates on KeyRune before checking the rune value
+---
+
+## 2026-03-11 - US-003
+- Added term.KeyCtrlL case in normal mode that activates minibuffer with "Goto line: " prompt
+- Callback parses input with strconv.Atoi, validates (< 1 or non-integer → "Invalid line number"), clamps to last line if exceeds total, sets CursorR/CursorC=0
+- Added strconv import
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - The minibuffer infrastructure handles C-g cancellation automatically — no extra code needed
+  - AdjustScroll in redraw() automatically makes the cursor visible after jumping
+  - The `buf` variable captured in closures is the local alias; it correctly references the active buffer at callback time
+---

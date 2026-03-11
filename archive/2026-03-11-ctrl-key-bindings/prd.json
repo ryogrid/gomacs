@@ -1,0 +1,58 @@
+{
+  "project": "goomacs",
+  "branchName": "ralph/ctrl-key-bindings",
+  "description": "Additional Ctrl Key Bindings - Add C-h (backspace), C-j (enter), and C-l (goto-line) keybindings",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "C-h as Backspace in all modes",
+      "description": "As a user, I want C-h to delete the character before the cursor so that I can backspace without leaving the home row.",
+      "acceptanceCriteria": [
+        "In normal editing mode, C-h (term.KeyCtrlH) behaves identically to Backspace: calls buf.SaveUndo() then buf.Backspace()",
+        "In search mode, C-h removes the last character from the search query (add term.KeyCtrlH to the existing Backspace case)",
+        "In minibuffer mode, C-h removes the last character from the minibuffer input (add term.KeyCtrlH to the existing Backspace case)",
+        "go build . succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "Simple change: add term.KeyCtrlH to every existing 'case term.KeyBackspace, term.KeyBackspace2:' in main.go. There are three locations: search mode handler, minibuffer mode handler, and normal mode handler."
+    },
+    {
+      "id": "US-002",
+      "title": "C-j as Enter in all modes",
+      "description": "As a user, I want C-j to insert a newline so that I can press Enter without leaving the home row.",
+      "acceptanceCriteria": [
+        "In normal editing mode, C-j (term.KeyCtrlJ) behaves identically to Enter: handles Buffer List special case, otherwise calls buf.SaveUndo() then buf.InsertNewline()",
+        "In search mode, C-j exits search and accepts the current match (add term.KeyCtrlJ to the existing Enter case)",
+        "In minibuffer mode, C-j accepts the input and calls the callback (add term.KeyCtrlJ to the existing Enter case)",
+        "In confirm mode, C-j does NOT act as 'yes' — only 'y'/'n' rune keys are valid (no change needed, confirm mode checks ev.Key() == term.KeyRune)",
+        "go build . succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Simple change: add term.KeyCtrlJ to every existing 'case term.KeyEnter:' in main.go. There are three locations: search mode handler, minibuffer mode handler, and normal mode handler. Confirm mode already only responds to KeyRune 'y'/'n', so no change needed there."
+    },
+    {
+      "id": "US-003",
+      "title": "C-l Goto Line via minibuffer",
+      "description": "As a user, I want to press C-l to be prompted for a line number and jump directly to that line, so that I can navigate large files quickly.",
+      "acceptanceCriteria": [
+        "C-l (term.KeyCtrlL) in normal mode activates the minibuffer with prompt 'Goto line: '",
+        "Entering a valid number (e.g. '42') moves cursor to that line (1-based: line 1 = first line), with CursorC set to 0",
+        "If the number exceeds total lines, cursor moves to the last line",
+        "If the number is less than 1 or not a valid integer, message 'Invalid line number' is shown and cursor does not move",
+        "After jumping, message line shows 'Line N' where N is the 1-based line number jumped to",
+        "Window scroll adjusts to make target line visible (via existing AdjustScroll in redraw)",
+        "C-g cancels the goto-line prompt without moving the cursor",
+        "Uses strconv.Atoi to parse input; strconv must be imported if not already",
+        "go build . succeeds",
+        "go test ./... passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "Add a new case term.KeyCtrlL in the normal mode key handler. Use the existing minibuffer infrastructure: set minibufferMode=true, minibufferPrompt='Goto line: ', minibufferInput=nil, and minibufferCallback to a closure that parses the input with strconv.Atoi, validates, sets buf.CursorR and buf.CursorC=0. The closure captures buf. AdjustScroll happens automatically in redraw()."
+    }
+  ]
+}

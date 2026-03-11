@@ -153,7 +153,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "For file operations, use createTestFile to create temp files with known content. For tab completion test, create a temp directory with uniquely-named files so the completion is deterministic. Remember C-x C-f is two separate SendKeys: 'C-x' then 'C-f'."
     },
     {

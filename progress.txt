@@ -108,3 +108,17 @@
   - C-_ triggers undo; message line shows "Undo" on success
   - For region tests, use C-a to go to beginning, C-Space to set mark, C-f repeated to select chars
 ---
+
+## 2026-03-11 - US-008
+- Implemented buffer management E2E tests in e2e/buffer_test.go
+- Tests: OpenFile (C-x C-f), SwitchBuffer (C-x b), BufferList (C-x C-b), KillBuffer (C-x k), TabCompletion
+- Files changed: e2e/buffer_test.go (new)
+- **Learnings for future iterations:**
+  - C-x C-f opens "Find file:" minibuffer; type full path then Enter to open
+  - C-x b opens "Switch to buffer:" minibuffer; type buffer name (full path) then Enter
+  - C-x C-b shows *Buffer List* buffer with all open buffer names
+  - C-x k prompts for buffer to kill; Enter kills current buffer (default)
+  - Tab completion only works in "Find file:" prompt; single match completes fully, multiple matches show common prefix + options in message line
+  - For tab completion tests, create files with unique shared prefix in a temp dir for deterministic results
+  - Buffer names in C-x b use the full file path as stored in Filename field
+---

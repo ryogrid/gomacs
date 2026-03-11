@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"goomacs/term"
@@ -920,6 +921,26 @@ func main() {
 			case term.KeyCtrlD:
 				buf.SaveUndo()
 				buf.DeleteChar()
+			case term.KeyCtrlL:
+				minibufferMode = true
+				minibufferPrompt = "Goto line: "
+				minibufferInput = nil
+				minibufferCallback = func(input string) {
+					n, err := strconv.Atoi(input)
+					if err != nil || n < 1 {
+						message = "Invalid line number"
+						return
+					}
+					if n > len(buf.Lines) {
+						n = len(buf.Lines)
+					}
+					buf.CursorR = n - 1
+					buf.CursorC = 0
+					message = fmt.Sprintf("Line %d", n)
+				}
+				message = minibufferPrompt
+				redraw()
+				continue
 			case term.KeyEnter, term.KeyCtrlJ:
 				if buf.Filename == "*Buffer List*" {
 					// Line index maps directly to buffers index.

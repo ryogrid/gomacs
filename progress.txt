@@ -15,3 +15,12 @@
 - C-x 2 splits vertically (top/bottom), C-x 3 splits horizontally (side-by-side), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
 
 ## Progress: Ctrl Key Bindings
+
+## 2026-03-11 - US-001
+- Added term.KeyCtrlH to all three Backspace case statements in main.go (search mode, minibuffer mode, normal mode)
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - main.go uses tabs for indentation — the Edit tool needs exact tab characters to match
+  - Three mode handlers have parallel structure for key dispatch: search mode → minibuffer mode → confirm mode → normal mode
+  - Adding a new key alternative to an existing action is just appending to the case list
+---

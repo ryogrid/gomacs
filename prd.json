@@ -15,7 +15,7 @@
         "go test ./... passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Simple change: add term.KeyCtrlH to every existing 'case term.KeyBackspace, term.KeyBackspace2:' in main.go. There are three locations: search mode handler, minibuffer mode handler, and normal mode handler."
     },
     {

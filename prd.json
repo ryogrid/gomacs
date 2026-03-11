@@ -16,7 +16,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This is pure infrastructure with no UI. The Fn signature func(*Buffer, *string) gives the handler access to the active buffer and a pointer to the message string for status feedback. Do not register any commands yet — that happens in later stories."
     },
     {
@@ -32,7 +32,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Reuse the existing minibuffer infrastructure (minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback). The callback should look up the command and invoke it. The 'x' case goes in the Alt key handling block around line 983-994 in main.go, alongside existing M-v, M-w, M-<, M-> handlers."
     },
     {
@@ -49,7 +49,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "The existing Tab handler in the minibuffer event loop checks minibufferPrompt to decide what to complete. Currently it only handles 'Find file: '. Add an else-if for 'M-x '. Use strings.Join on the command names for the candidate list display."
     },
     {
@@ -66,7 +66,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "go-enry returns language names like 'Go', 'Python', 'JavaScript', 'HTML', 'CSS', etc. The map keys must match these exact names. For languages with line comments only (Go, Python, etc.), set LinePrefix and leave BlockStart/BlockEnd empty. For languages with block comments only (HTML, CSS), set BlockStart/BlockEnd and leave LinePrefix empty. Some languages have both (C, Java) — set LinePrefix for the common case. enry.GetLanguage takes (filename string, content []byte) and returns a language name string."
     },
     {
@@ -87,7 +87,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "buf.Lines is [][]rune. To prepend a comment prefix, convert the prefix to []rune and prepend it to buf.Lines[row]. buf.regionBounds() returns (startR, startC, endR, endC) — only use startR and endR since commenting operates on full lines. To get buffer content as a string for detectCommentStyle, join all lines with newlines. Remember to call RegisterCommand in an init() function or at package level."
     },
     {
@@ -109,7 +109,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "For line comment removal, use strings.Index or a manual scan on the string version of each line to find the prefix position. Handle both '// code' (prefix+space) and '//code' (prefix only). For whitespace tolerance, trim leading whitespace to find the prefix, but preserve the indentation structure (only remove the prefix itself, not the indentation). buf.Lines[row] is []rune — convert to string for matching, then back to []rune after modification."
     }
   ]

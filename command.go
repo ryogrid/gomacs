@@ -82,6 +82,7 @@ func FindCommand(name string) *Command {
 
 func init() {
 	RegisterCommand("comment-region", commentRegion)
+	RegisterCommand("uncomment-region", uncommentRegion)
 }
 
 // commentRegion comments out the selected region of code.
@@ -119,6 +120,66 @@ func commentRegion(buf *Buffer, message *string) {
 	buf.HighlightDirty = true
 	buf.DeactivateMark()
 	*message = "Region commented"
+}
+
+// uncommentRegion removes comment markers from the selected region of code.
+func uncommentRegion(buf *Buffer, message *string) {
+	if !buf.MarkActive {
+		*message = "No region selected"
+		return
+	}
+
+	buf.SaveUndo()
+
+	startR, _, endR, _ := buf.regionBounds()
+
+	// Build buffer content string for language detection
+	lineStrs := make([]string, len(buf.Lines))
+	for i, line := range buf.Lines {
+		lineStrs[i] = string(line)
+	}
+	content := strings.Join(lineStrs, "\n")
+
+	style := detectCommentStyle(buf.Filename, content)
+
+	for row := startR; row <= endR; row++ {
+		line := string(buf.Lines[row])
+		if style.LinePrefix != "" {
+			// Find the line prefix, tolerating leading whitespace
+			trimmed := strings.TrimLeft(line, " \t")
+			idx := strings.Index(line, trimmed)
+			indent := line[:idx]
+			if strings.HasPrefix(trimmed, style.LinePrefix+" ") {
+				// Remove prefix with trailing space
+				buf.Lines[row] = []rune(indent + trimmed[len(style.LinePrefix)+1:])
+			} else if strings.HasPrefix(trimmed, style.LinePrefix) {
+				// Remove prefix without trailing space
+				buf.Lines[row] = []rune(indent + trimmed[len(style.LinePrefix):])
+			}
+		} else {
+			// Block comments: remove BlockStart (+ optional space) from beginning and BlockEnd (+ optional space) from end
+			modified := line
+			trimmedLeft := strings.TrimLeft(modified, " \t")
+			idxL := strings.Index(modified, trimmedLeft)
+			indentL := modified[:idxL]
+			if strings.HasPrefix(trimmedLeft, style.BlockStart+" ") {
+				modified = indentL + trimmedLeft[len(style.BlockStart)+1:]
+			} else if strings.HasPrefix(trimmedLeft, style.BlockStart) {
+				modified = indentL + trimmedLeft[len(style.BlockStart):]
+			}
+			if strings.HasSuffix(modified, " "+style.BlockEnd) {
+				modified = modified[:len(modified)-len(style.BlockEnd)-1]
+			} else if strings.HasSuffix(modified, style.BlockEnd) {
+				modified = modified[:len(modified)-len(style.BlockEnd)]
+			}
+			buf.Lines[row] = []rune(modified)
+		}
+	}
+
+	buf.Modified = true
+	buf.HighlightDirty = true
+	buf.DeactivateMark()
+	*message = "Region uncommented"
 }
 
 // FindCommandsByPrefix returns all commands whose names start with the given prefix.

@@ -455,6 +455,7 @@ func main() {
 					message = minibufferPrompt + string(minibufferInput)
 				default:
 					// All other keys are ignored in minibuffer mode
+					message = minibufferPrompt + string(minibufferInput)
 				}
 				redraw()
 				continue

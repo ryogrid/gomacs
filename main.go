@@ -403,7 +403,7 @@ func main() {
 					if cb != nil {
 						cb(input)
 					}
-				case term.KeyCtrlG:
+				case term.KeyCtrlG, term.KeyEsc:
 					minibufferMode = false
 					minibufferInput = nil
 					minibufferCallback = nil
@@ -991,6 +991,19 @@ func main() {
 						buf.MoveBeginningOfBuffer()
 					case '>':
 						buf.MoveEndOfBuffer()
+					case 'x':
+						minibufferMode = true
+						minibufferPrompt = "M-x "
+						minibufferInput = nil
+						minibufferCallback = func(input string) {
+							cmd := FindCommand(input)
+							if cmd != nil {
+								cmd.Fn(buf, &message)
+							} else {
+								message = fmt.Sprintf("Unknown command: %s", input)
+							}
+						}
+						message = minibufferPrompt
 					}
 				} else {
 					buf.SaveUndo()
@@ -1010,6 +1023,19 @@ func main() {
 						buf.MoveBeginningOfBuffer()
 					case '>':
 						buf.MoveEndOfBuffer()
+					case 'x':
+						minibufferMode = true
+						minibufferPrompt = "M-x "
+						minibufferInput = nil
+						minibufferCallback = func(input string) {
+							cmd := FindCommand(input)
+							if cmd != nil {
+								cmd.Fn(buf, &message)
+							} else {
+								message = fmt.Sprintf("Unknown command: %s", input)
+							}
+						}
+						message = minibufferPrompt
 					}
 				}
 			}

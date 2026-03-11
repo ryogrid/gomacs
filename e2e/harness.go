@@ -77,6 +77,20 @@ func (h *Harness) Capture() []string {
 	return lines
 }
 
+// CaptureWithEscapes captures the tmux pane preserving ANSI escape sequences.
+func (h *Harness) CaptureWithEscapes() []string {
+	cmd := exec.Command("tmux", "capture-pane", "-e", "-t", h.session, "-p")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	lines := strings.Split(string(out), "\n")
+	if len(lines) > h.height {
+		lines = lines[:h.height]
+	}
+	return lines
+}
+
 // CapturePane returns the full screen as a single string (rows joined by newlines).
 func (h *Harness) CapturePane() string {
 	lines := h.Capture()

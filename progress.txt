@@ -14,4 +14,18 @@
 - recalcWindows(windows, screenHeight) distributes height evenly, reserves 1 row for message line
 - C-x 2 splits vertically (top/bottom), C-x 3 splits horizontally (side-by-side), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
 
+- e2e/ directory contains E2E tests; harness.go provides Harness struct for tmux-based testing
+- Harness.Start() creates detached tmux session, Harness.SendKeys() sends keys, Harness.Capture() returns screen rows
+- Session names are sanitized (/ . : replaced with -) and have random suffix for parallel test support
+
 ## Progress: E2E Testing Framework
+
+## 2026-03-11 - US-001
+- Implemented tmux test harness core in e2e/harness.go
+- Files changed: e2e/harness.go (new)
+- **Learnings for future iterations:**
+  - tmux session names cannot contain `.` `/` `:` — sanitize t.Name() before using
+  - 200ms sleep after Start() is needed for goomacs to initialize
+  - tmux capture-pane -p outputs lines with possible trailing newline; trim to height
+  - Harness uses t.Cleanup for automatic session teardown
+---

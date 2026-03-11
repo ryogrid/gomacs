@@ -20,7 +20,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This is the foundation. Create the e2e/ directory and harness.go. Use os/exec to run tmux commands. The Harness should take *testing.T so it can call t.Helper(), t.Cleanup(), and t.Fatal(). Use a 200ms sleep after Start() to let goomacs initialize before sending keys."
     },
     {

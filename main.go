@@ -458,6 +458,21 @@ func main() {
 							}
 						}
 						message = minibufferPrompt + string(minibufferInput)
+					} else if minibufferPrompt == "M-x " {
+						input := string(minibufferInput)
+						matches := FindCommandsByPrefix(input)
+						if len(matches) == 1 {
+							minibufferInput = []rune(matches[0].Name)
+						} else if len(matches) > 1 {
+							var names []string
+							for _, m := range matches {
+								names = append(names, m.Name)
+							}
+							message = strings.Join(names, " ")
+							redraw()
+							continue
+						}
+						message = minibufferPrompt + string(minibufferInput)
 					}
 				case term.KeyRune:
 					minibufferInput = append(minibufferInput, ev.Rune())

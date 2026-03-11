@@ -80,6 +80,47 @@ func FindCommand(name string) *Command {
 	return nil
 }
 
+func init() {
+	RegisterCommand("comment-region", commentRegion)
+}
+
+// commentRegion comments out the selected region of code.
+func commentRegion(buf *Buffer, message *string) {
+	if !buf.MarkActive {
+		*message = "No region selected"
+		return
+	}
+
+	buf.SaveUndo()
+
+	startR, _, endR, _ := buf.regionBounds()
+
+	// Build buffer content string for language detection
+	lines := make([]string, len(buf.Lines))
+	for i, line := range buf.Lines {
+		lines[i] = string(line)
+	}
+	content := strings.Join(lines, "\n")
+
+	style := detectCommentStyle(buf.Filename, content)
+
+	for row := startR; row <= endR; row++ {
+		line := buf.Lines[row]
+		if style.LinePrefix != "" {
+			prefix := []rune(style.LinePrefix + " ")
+			buf.Lines[row] = append(prefix, line...)
+		} else {
+			wrapped := []rune(style.BlockStart + " " + string(line) + " " + style.BlockEnd)
+			buf.Lines[row] = wrapped
+		}
+	}
+
+	buf.Modified = true
+	buf.HighlightDirty = true
+	buf.DeactivateMark()
+	*message = "Region commented"
+}
+
 // FindCommandsByPrefix returns all commands whose names start with the given prefix.
 func FindCommandsByPrefix(prefix string) []Command {
 	var result []Command

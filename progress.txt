@@ -33,3 +33,14 @@
   - The Edit tool can struggle with tab-indented Go code; using sed for simple substitutions is more reliable
   - Confirm mode is safe from new key additions since it gates on KeyRune before checking the rune value
 ---
+
+## 2026-03-11 - US-003
+- Added term.KeyCtrlL case in normal mode that activates minibuffer with "Goto line: " prompt
+- Callback parses input with strconv.Atoi, validates (< 1 or non-integer → "Invalid line number"), clamps to last line if exceeds total, sets CursorR/CursorC=0
+- Added strconv import
+- Files changed: main.go
+- **Learnings for future iterations:**
+  - The minibuffer infrastructure handles C-g cancellation automatically — no extra code needed
+  - AdjustScroll in redraw() automatically makes the cursor visible after jumping
+  - The `buf` variable captured in closures is the local alias; it correctly references the active buffer at callback time
+---

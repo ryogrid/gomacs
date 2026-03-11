@@ -51,7 +51,7 @@
         "go test ./... passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Add a new case term.KeyCtrlL in the normal mode key handler. Use the existing minibuffer infrastructure: set minibufferMode=true, minibufferPrompt='Goto line: ', minibufferInput=nil, and minibufferCallback to a closure that parses the input with strconv.Atoi, validates, sets buf.CursorR and buf.CursorC=0. The closure captures buf. AdjustScroll happens automatically in redraw()."
     }
   ]

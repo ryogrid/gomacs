@@ -11,6 +11,8 @@ import (
 	"time"
 	"unicode/utf8"
 	"unsafe"
+
+	"github.com/mattn/go-runewidth"
 )
 
 // termios mirrors the C struct termios for terminal I/O settings.
@@ -298,6 +300,11 @@ func (t *Terminal) Show() {
 				t.out.WriteByte('H')
 				t.writeStyledCell(cur.ch, cur.style)
 				t.prev[r][c] = cur
+				// Wide character: skip the next column (covered by this char).
+				if runewidth.RuneWidth(cur.ch) == 2 && c+1 < t.width {
+					t.prev[r][c+1] = t.cells[r][c+1]
+					c++
+				}
 			}
 		}
 	}

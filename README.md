@@ -142,6 +142,7 @@ goomacs/
 ## Dependencies
 
 - [github.com/alecthomas/chroma/v2](https://github.com/alecthomas/chroma) -- Syntax highlighting (lexers and themes)
+- [github.com/mattn/go-runewidth](https://github.com/mattn/go-runewidth) -- Unicode character width calculation (East Asian wide characters, etc.)
 
 All terminal handling uses only the Go standard library (`syscall`, `os`, `bufio`, `unicode/utf8`, etc.) via ANSI/VT100 escape sequences.
 

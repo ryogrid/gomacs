@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mattn/go-runewidth"
+
 	"goomacs/term"
 )
 
@@ -23,7 +25,7 @@ func bufColToVisualCol(line []rune, bufCol int) int {
 		if line[i] == '\t' {
 			visualCol += tabWidth - (visualCol % tabWidth)
 		} else {
-			visualCol++
+			visualCol += runewidth.RuneWidth(line[i])
 		}
 	}
 	return visualCol
@@ -149,8 +151,14 @@ func main() {
 		for _, filename := range os.Args[1:] {
 			b, err := NewBufferFromFile(filename)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error opening file: %v\n", err)
-				os.Exit(1)
+				if os.IsNotExist(err) {
+					b = NewBuffer()
+					b.Filename = filename
+					b.Highlight = NewHighlighter(filename)
+				} else {
+					fmt.Fprintf(os.Stderr, "error opening file: %v\n", err)
+					os.Exit(1)
+				}
 			}
 			buffers = append(buffers, b)
 		}
@@ -1091,7 +1099,11 @@ func drawWindowContent(screen term.Screen, win *Window, sh searchHighlight) {
 				}
 			} else {
 				screen.SetContent(win.StartCol+visualCol, screenRow, line[bufCol], style)
-				visualCol++
+				w := runewidth.RuneWidth(line[bufCol])
+				if w == 2 && visualCol+1 < winWidth {
+					screen.SetContent(win.StartCol+visualCol+1, screenRow, 0, style)
+				}
+				visualCol += w
 			}
 		}
 	}
@@ -1104,11 +1116,17 @@ func drawMessageLine(screen term.Screen, msg string) {
 		return
 	}
 	msgRow := height - 1
-	for i, ch := range []rune(msg) {
-		if i >= width {
+	visualCol := 0
+	for _, ch := range msg {
+		w := runewidth.RuneWidth(ch)
+		if visualCol+w > width {
 			break
 		}
-		screen.SetContent(i, msgRow, ch, term.StyleDefault)
+		screen.SetContent(visualCol, msgRow, ch, term.StyleDefault)
+		if w == 2 && visualCol+1 < width {
+			screen.SetContent(visualCol+1, msgRow, 0, term.StyleDefault)
+		}
+		visualCol += w
 	}
 }
 

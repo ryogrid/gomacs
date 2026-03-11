@@ -171,7 +171,7 @@
         "go vet ./e2e/... passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "For vertical split (C-x 2), count rows that look like status bars (contain '==' or '--'). For horizontal split (C-x 3), check for the Unicode box-drawing character '│' (U+2502). After C-x o, the active/inactive markers swap."
     },
     {

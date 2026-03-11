@@ -122,3 +122,17 @@
   - For tab completion tests, create files with unique shared prefix in a temp dir for deterministic results
   - Buffer names in C-x b use the full file path as stored in Filename field
 ---
+
+## 2026-03-11 - US-009
+- Implemented window splitting E2E tests in e2e/window_test.go
+- Tests: VerticalSplit (C-x 2), HorizontalSplit (C-x 3), SwitchWindow (C-x o), CloseWindow (C-x 0), CloseOtherWindows (C-x 1)
+- Files changed: e2e/window_test.go (new)
+- **Learnings for future iterations:**
+  - Active window status bar: reverse video with space fill; inactive: default style with '-' fill char
+  - Horizontal split (C-x 3) draws '│' (U+2502) separator between side-by-side windows
+  - To detect status bars in capture: look for lines containing "Line " (position indicator) with many dashes or spaces
+  - Cannot mix split modes: vertical split blocked while in horizontal mode and vice versa
+  - C-x o cycles activeWindowIdx; screen changes because active/inactive status bar rendering swaps
+  - After C-x 0, if activeWindowIdx >= len(windows) it wraps to len-1
+  - After C-x 1, only the active window survives; splitMode resets to "vertical"
+---

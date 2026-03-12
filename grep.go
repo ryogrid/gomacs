@@ -1,12 +1,29 @@
 package main
 
 import (
+	"bytes"
+	"os/exec"
 	"strconv"
 	"strings"
+
+	"goomacs/term"
 )
 
 // lastGrepCommand stores the most recently executed grep command for re-execution via g.
 var lastGrepCommand string
+
+// editorScreen holds a reference to the terminal screen for posting events from goroutines.
+var editorScreen term.Screen
+
+// grepResultMsg holds the output from an async grep command execution.
+type grepResultMsg struct {
+	stdout string
+	stderr string
+	err    error
+}
+
+// grepResultCh is used by the grep goroutine to send results back to the main event loop.
+var grepResultCh = make(chan grepResultMsg, 1)
 
 // GrepResult represents a single parsed grep output line.
 type GrepResult struct {
@@ -67,6 +84,28 @@ func findGrepCommand(buf *Buffer, message *string) {
 	minibufferInput = []rune(defaultCmd)
 	minibufferCallback = func(input string) {
 		lastGrepCommand = input
+		*message = "Searching..."
+		executeGrepCommand(input)
 	}
 	*message = minibufferPrompt + defaultCmd
+}
+
+// executeGrepCommand runs a grep command asynchronously and sends the result on grepResultCh.
+func executeGrepCommand(cmd string) {
+	go func() {
+		c := exec.Command("sh", "-c", cmd)
+		var stdout, stderr bytes.Buffer
+		c.Stdout = &stdout
+		c.Stderr = &stderr
+		err := c.Run()
+		grepResultCh <- grepResultMsg{
+			stdout: stdout.String(),
+			stderr: stderr.String(),
+			err:    err,
+		}
+		// Wake up the event loop by posting a synthetic event.
+		if editorScreen != nil {
+			editorScreen.PostEvent(term.NewKeyEvent(term.KeyNUL, 0, term.ModNone))
+		}
+	}()
 }

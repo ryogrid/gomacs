@@ -45,6 +45,12 @@ func newHarness(t *testing.T, args ...string) *Harness {
 	return Start(t, gomacsPath, args...)
 }
 
+// newHarnessInDir creates a Harness that starts goomacs in the given directory.
+func newHarnessInDir(t *testing.T, dir string, args ...string) *Harness {
+	t.Helper()
+	return StartInDir(t, dir, gomacsPath, args...)
+}
+
 // createTestFile writes content to a temp file and returns its path.
 func createTestFile(t *testing.T, name string, content string) string {
 	t.Helper()

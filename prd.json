@@ -18,7 +18,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "This is pure parsing logic with no UI. ParseGrepLine should find the first colon, then the second colon (after the line number), and split accordingly. Use strconv.Atoi to validate the line number portion. If it's not a valid integer, return false."
     },
     {
@@ -36,7 +36,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "The mode handler dispatch should go after the prefixCx check and before the main switch on ev.Key(). The ReadOnly check should be in the character insertion and editing sections — not a blanket block on all keys. modeHandlers is a map so other features can register their own modes later. The handler signature includes *Buffer and *string (message) to match the existing command pattern."
     },
     {
@@ -53,7 +53,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "The command handler has signature func(*Buffer, *string). It needs to set minibufferMode, minibufferPrompt, minibufferInput, and minibufferCallback — these are package-level vars in main.go. Since grep.go is in the same package (main), it can access them directly. Set minibufferInput to []rune of the default command string. The callback will be implemented in the next story."
     },
     {
@@ -73,7 +73,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "The async notification is the trickiest part. Options: (1) Add a channel var grepResultCh chan grepResult that the main event loop checks after each PollEvent with a non-blocking select. (2) Use the terminal's event injection if available. Option 1 is simpler. The goroutine sends results (stdout, stderr, error) on the channel. The main loop checks it each iteration. When results arrive, create/update the *grep* buffer. The buffer's Lines should be set to the raw grep output lines converted to [][]rune."
     },
     {
@@ -89,7 +89,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "The grep mode handler checks ev.Key() == term.KeyRune and then ev.Rune() for 'n', 'p', 'q'. For n: scan forward from CursorR+1 to find the next line where ParseGrepLine returns true. For p: scan backward from CursorR-1. For q: find the *grep* buffer index in buffers, remove it with append(buffers[:i], buffers[i+1:]...), adjust activeBufferIdx. Remember to handle the case where removing the buffer changes indices."
     },
     {
@@ -107,7 +107,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "To scroll the target line into view, set ScrollOffset = max(0, targetLine - viewHeight/2) to center it. Check all existing buffers by comparing b.Filename to the grep result's File field. If the result File is a relative path like './foo.go', it should match a buffer with Filename './foo.go'. When jumping, update previousBufferIdx to point to the *grep* buffer index so the user can easily return."
     },
     {
@@ -123,7 +123,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "For M-n: get current file from ParseGrepLine on current line. Scan forward from CursorR+1; skip lines with the same file. Stop at the first line with a different file. For M-p: similar but scan backward — find the first line with a different file, then continue backward to find where that file's results start. For g: reuse the same execution logic from US-004 (extract it into a helper function like executeGrepCommand(cmd string)). The Alt modifier is detected via ev.Modifiers()&term.ModAlt != 0."
     },
     {
@@ -143,7 +143,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Start goomacs with the working directory set to the temp fixture dir (use Harness.Start with appropriate args or chdir). For M-x, send 'Escape' then 'x' with 50ms gap. Then type 'find-grep' and Enter. To modify the default command, use C-a to go to beginning, C-k to kill the line, then type the custom command. Wait for *grep* to appear with WaitForContent. For tmux SendKeys, use the existing patterns from other e2e tests."
     },
     {
@@ -163,7 +163,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "For M-n/M-p, send 'Escape' then 'n'/'p' with 50ms gap. For g, just send 'g'. To verify cursor position, use AssertLineContains on the current cursor row (get cursor position via CursorPosition helper) or check message line content. For the refresh test, the fixture file modification must happen outside goomacs (direct os.WriteFile), then pressing g in the *grep* buffer should show the new match."
     },
     {
@@ -178,7 +178,7 @@
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Keep the documentation concise and consistent with existing README tone. The *grep* buffer keybinding table should be placed after the Command Palette section since it describes a special buffer mode, not a global keybinding. Use the same table format as existing keybinding sections (| Key | Action |)."
     }
   ]

@@ -13,12 +13,154 @@
 - Window struct: Buffer, ScrollOffset, StartRow, Height; ViewHeight() = Height-1
 - recalcWindows(windows, screenHeight) distributes height evenly, reserves 1 row for message line
 - C-x 2 splits vertically (top/bottom), C-x 3 splits horizontally (side-by-side), C-x o cycles windows, C-x 0 closes active, C-x 1 keeps only active
-- Minibuffer: minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback — Tab handler checks prompt to decide completion type
+- Minibuffer: minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback are **package-level vars** in main.go — Tab handler checks prompt to decide completion type
 - Alt keys dispatched at ~line 983 in main.go: M-v, M-w, M-<, M->
 - regionBounds() returns (startR, startC, endR, endC); SaveUndo() snapshots for single-step undo
 - detectCommentStyle(filename, content) returns CommentStyle; check LinePrefix != "" for line comments, else use BlockStart/BlockEnd
 - Command struct uses func(*Buffer, *string) signature; RegisterCommand in init(); FindCommand/FindCommandsByPrefix for lookup
 - CaptureWithEscapes() on Harness captures tmux pane with ANSI escapes preserved (-e flag)
 - e2e/ directory contains E2E tests; harness.go provides Harness struct for tmux-based testing
+- editorScreen (package-level in grep.go) allows goroutines to PostEvent to wake PollEvent
+- grepResultCh channel + non-blocking select after event switch handles async grep results
+- executeGrepCommand(cmd) launches goroutine, sends on grepResultCh, posts synthetic event
+- buffers, activeBufferIdx, previousBufferIdx are **package-level vars** — mode handlers can switch/remove buffers
+- After mode handler returns true, main.go auto-refreshes `buf` and `activeWin.Buffer` from activeBufferIdx
+- Minibuffer only supports Backspace for editing (no C-a, C-k, cursor movement) — in e2e tests, use SendKeysRepeat("BSpace", N) to clear pre-populated input
+- StartInDir(t, dir, binary, args...) launches tmux session in a specific directory (uses tmux -c flag)
+- grep exit code 1 (no matches) with no stderr → "No matches found" message (not an error)
+- For Alt keys in e2e tests, use tmux `M-n`/`M-p` syntax directly — do NOT use `Escape` + sleep + `n` (terminal library may not combine them)
+- grep -rnH output order is not alphabetical — pipe through `| sort` for predictable test assertions
 
 ## Progress: find-grep Command
+
+## 2026-03-12 - US-001
+- Implemented GrepResult struct with File, Line, Text fields
+- Implemented ParseGrepLine and ParseGrepOutput functions in grep.go
+- Created grep_test.go with comprehensive unit tests covering: standard lines, colons in text, empty text, directory paths, spaces in paths, empty lines, non-matching lines, binary file notices
+- All tests pass, go vet clean
+- Files changed: grep.go (new), grep_test.go (new)
+- **Learnings for future iterations:**
+  - grep.go is in package main, same as buffer.go and command.go — can access all package-level vars directly
+  - ParseGrepLine uses first colon for file path, second colon for line number boundary — everything after second colon is text (handles colons in text correctly)
+---
+
+## 2026-03-12 - US-002
+- Added Mode (string) and ReadOnly (bool) fields to Buffer struct in buffer.go
+- Added package-level modeHandlers map[string]func(...) bool in main.go
+- Mode handler dispatch inserted after confirm mode check, before C-x prefix handling — if handler returns true, key is consumed
+- ReadOnly check blocks: KeyRune (without Alt), Backspace, C-d, C-k, C-y, Enter/C-j with "Buffer is read-only" message
+- Navigation keys (C-n, C-p, C-f, C-b, C-v, M-v, C-a, C-e, arrows) still work in read-only buffers
+- Files changed: buffer.go, main.go
+- **Learnings for future iterations:**
+  - Mode handler dispatch goes after confirm mode block and before kill tracking reset (~line 516 area in main.go)
+  - ReadOnly check is separate from mode handlers — it blocks specific editing keys individually rather than a blanket block
+  - modeHandlers is a package-level var, so grep.go (same package) can register handlers in init()
+---
+
+## 2026-03-12 - US-003
+- Registered 'find-grep' command via RegisterCommand in grep.go init()
+- Command opens minibuffer with prompt "Run find-grep: " and pre-populated default command
+- Callback stores submitted command in lastGrepCommand package-level var
+- Promoted minibuffer vars (minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback) from main() locals to package-level vars so grep.go can access them
+- Files changed: grep.go, main.go
+- **Learnings for future iterations:**
+  - Minibuffer vars were originally local to main() — had to promote them to package level for cross-file access
+  - findGrepCommand sets minibufferInput to []rune(defaultCmd) to pre-populate the prompt
+  - The message must be set to prompt + input string so the user sees the pre-populated text immediately
+---
+
+## 2026-03-12 - US-004
+- Implemented async grep command execution via goroutine with os/exec sh -c
+- Added grepResultCh channel and grepResultMsg struct for async communication
+- Added editorScreen package-level var so goroutine can PostEvent to wake up PollEvent
+- Main event loop checks grepResultCh with non-blocking select after each event
+- Creates/reuses *grep* buffer with Mode="grep", ReadOnly=true
+- Handles no-output (message "No matches found") and stderr errors
+- Files changed: grep.go, main.go
+- **Learnings for future iterations:**
+  - editorScreen is a package-level var set in main() — goroutines can use it to PostEvent and wake up PollEvent
+  - grepResultCh is buffered (size 1) — goroutine sends result, then posts synthetic KeyNUL event to wake the event loop
+  - The channel check uses non-blocking select (with default case) after the main switch ev.(type) block
+  - executeGrepCommand(cmd string) is a reusable helper — can be called from the "g" refresh key in US-007
+---
+
+## 2026-03-12 - US-005
+- Registered 'grep' mode handler in modeHandlers map via init() in grep.go
+- n key scans forward from CursorR+1 for next valid ParseGrepLine result; shows "No more results" at end
+- p key scans backward from CursorR-1 for previous valid ParseGrepLine result; shows "No more results" at start
+- q key removes *grep* buffer from buffers slice, adjusts activeBufferIdx to previousBufferIdx, handles index shifting
+- Handler returns true for n, p, q to consume them; false for all other keys
+- Promoted buffers, activeBufferIdx, previousBufferIdx to package-level vars so grep.go can manipulate them for q
+- Added post-handler fixup in mode dispatch: updates local buf and activeWin.Buffer after handler returns true
+- Files changed: grep.go, main.go
+- **Learnings for future iterations:**
+  - buffers, activeBufferIdx, previousBufferIdx are now package-level vars (promoted from main() locals for grep.go access)
+  - After mode handler returns true, main.go refreshes `buf = buffers[activeBufferIdx]` and `activeWin.Buffer = buf` — future handlers that switch buffers rely on this
+  - When removing a buffer from buffers slice, must adjust all index vars that reference positions after the removed index
+  - grepModeHandler only checks ev.Key() == term.KeyRune, so normal navigation (C-n, C-p, arrows, etc.) falls through correctly
+---
+
+## 2026-03-12 - US-006
+- Implemented RET (Enter) key handling in grepModeHandler to jump to source file and line
+- Parses current line with ParseGrepLine, checks existing buffers by Filename before opening new
+- Handles os.IsNotExist with "File not found: <path>" message, stays in *grep* buffer
+- Sets previousBufferIdx to grep buffer index so user can return easily
+- Moves cursor to target line (1-indexed to 0-indexed), sets CursorC=0
+- AdjustScroll in redraw() ensures target line is visible in the window
+- Files changed: grep.go
+- **Learnings for future iterations:**
+  - KeyEnter check must come before the `ev.Key() != term.KeyRune` early return in grepModeHandler
+  - Post-handler fixup in main.go (line ~527) updates activeWin.Buffer after handler returns true, so mode handlers can switch buffers by just setting activeBufferIdx
+  - AdjustScroll() in redraw() handles scroll visibility — no need for mode handlers to manually set ScrollOffset
+  - previousBufferIdx should be set to the grep buffer index (not the old previousBufferIdx) so user can easily return to *grep*
+---
+
+## 2026-03-12 - US-007
+- Implemented M-n (Alt+N) to jump to next file's results in *grep* buffer
+- Implemented M-p (Alt+P) to jump to previous file's first result
+- Implemented g key to re-execute lastGrepCommand and refresh *grep* buffer
+- Alt keys detected via ev.Modifiers()&term.ModAlt != 0, checked before plain rune switch
+- g reuses executeGrepCommand() helper; cursor reset handled by existing grepResultCh handler in main.go
+- Files changed: grep.go
+- **Learnings for future iterations:**
+  - Alt-modified keys still have ev.Key() == term.KeyRune, so check ModAlt before the plain rune switch to avoid conflicts with n/p
+  - M-p file navigation requires two scans: first backward to find a different file, then backward again to find the first result of that file
+  - The grepResultCh handler in main.go already resets CursorR/CursorC/ScrollOffset when repopulating, so g refresh doesn't need special cursor handling
+---
+
+## 2026-03-12 - US-008
+- Created e2e/grep_test.go with TestFindGrep group covering 6 subtests: Invoke, RET_JumpToSource, Navigation_NP, Quit, NoMatches, MalformedCommand
+- Added StartInDir() to harness.go for launching goomacs in a specific working directory (uses tmux -c flag)
+- Added newHarnessInDir() helper to e2e_test.go
+- Added SendKeysRepeat() to harness.go for sending repeated keys in a single tmux command
+- Fixed grep result handling in main.go: grep exit code 1 (no matches, no stderr) now shows "No matches found" instead of "grep command failed"
+- All tests pass with `go test ./e2e/ -v -timeout 120s -run TestFindGrep`
+- Files changed: e2e/grep_test.go (new), e2e/harness.go, e2e/e2e_test.go, main.go
+- **Learnings for future iterations:**
+  - Minibuffer has no cursor movement (C-a/C-k don't work) — must use backspaces to clear pre-populated input
+  - Individual SendKeys("BSpace") in a loop is too fast for tmux to process — use SendKeysRepeat() which sends all keys in a single tmux command
+  - grep returns exit code 1 when no matches are found (not a real error) — check for stderr to distinguish from actual command failures
+  - setupGrepFixtures creates a temp dir with hello.go, greet.go, sub/utils.go containing "hello" matches for grep tests
+  - invokeFindGrep helper handles M-x → find-grep → clear default → type custom command → submit
+---
+
+## 2026-03-12 - US-009
+- Added 7 new subtests to TestFindGrep: FileNav_MN, FileNav_MP, FileNav_MN_AtLastFile, FileNav_MP_AtFirstFile, Refresh_G, N_AtLastResult, P_AtFirstResult
+- Added setupGrepFixtures3Files() for predictable 3-file fixture setup with "marker" keyword
+- Files changed: e2e/grep_test.go
+- **Learnings for future iterations:**
+  - tmux `M-n`/`M-p` syntax sends Alt keys correctly; `Escape` + sleep + key does NOT work reliably (terminal library interprets them as separate events)
+  - grep -rnH does not output in alphabetical order — pipe through `| sort` for predictable test assertions
+  - WaitForContent is more reliable than AssertMessageLine for messages that may clear quickly
+---
+
+## 2026-03-12 - US-010
+- Added find-grep to Features list in README
+- Added find-grep row to Available commands table in Command Palette section
+- Added Find-Grep (*grep* buffer) keybinding subsection with RET, n, p, M-n, M-p, g, q documentation
+- Added grep.go, grep_test.go, and e2e/grep_test.go to Project Structure section
+- Files changed: README.md
+- **Learnings for future iterations:**
+  - README changes are documentation-only — no typecheck issues possible, but still run go vet for consistency
+  - The *grep* buffer keybinding table was placed after the Command Palette section, before the language detection paragraph
+---

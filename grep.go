@@ -289,6 +289,7 @@ func findGrepCommand(buf *Buffer, message *string) {
 	minibufferMode = true
 	minibufferPrompt = "Run find-grep: "
 	minibufferInput = []rune(defaultCmd)
+	minibufferCursorPos = len(minibufferInput)
 	minibufferCallback = func(input string) {
 		lastGrepCommand = input
 		*message = "Searching..."

@@ -74,6 +74,68 @@ func ParseGrepOutput(output string) []GrepResult {
 
 func init() {
 	RegisterCommand("find-grep", findGrepCommand)
+	modeHandlers["grep"] = grepModeHandler
+}
+
+// grepModeHandler handles keybindings in the *grep* buffer.
+func grepModeHandler(ev *term.KeyEvent, buf *Buffer, message *string) bool {
+	if ev.Key() != term.KeyRune {
+		return false
+	}
+	switch ev.Rune() {
+	case 'n':
+		// Next grep result
+		for i := buf.CursorR + 1; i < len(buf.Lines); i++ {
+			if _, ok := ParseGrepLine(string(buf.Lines[i])); ok {
+				buf.CursorR = i
+				buf.CursorC = 0
+				return true
+			}
+		}
+		*message = "No more results"
+		return true
+	case 'p':
+		// Previous grep result
+		for i := buf.CursorR - 1; i >= 0; i-- {
+			if _, ok := ParseGrepLine(string(buf.Lines[i])); ok {
+				buf.CursorR = i
+				buf.CursorC = 0
+				return true
+			}
+		}
+		*message = "No more results"
+		return true
+	case 'q':
+		// Close *grep* buffer and switch to previous buffer
+		grepIdx := -1
+		for i, b := range buffers {
+			if b.Filename == "*grep*" {
+				grepIdx = i
+				break
+			}
+		}
+		if grepIdx < 0 {
+			return true
+		}
+		newActive := previousBufferIdx
+		if newActive == grepIdx {
+			newActive = 0
+		}
+		buffers = append(buffers[:grepIdx], buffers[grepIdx+1:]...)
+		if newActive > grepIdx {
+			newActive--
+		}
+		if newActive >= len(buffers) {
+			newActive = len(buffers) - 1
+		}
+		if newActive < 0 {
+			newActive = 0
+		}
+		activeBufferIdx = newActive
+		previousBufferIdx = newActive
+		return true
+	}
+	return false
 }
 
 // findGrepCommand opens a minibuffer prompt for the find-grep command.

@@ -30,6 +30,7 @@ var previousBufferIdx int
 var minibufferMode bool             // true when minibuffer input is active
 var minibufferPrompt string         // prompt shown before input
 var minibufferInput []rune          // current input text
+var minibufferCursorPos int         // cursor position within minibufferInput
 var minibufferCallback func(string) // called with input on Enter
 
 // bufColToVisualCol converts a buffer column index to a visual (screen) column
@@ -246,7 +247,7 @@ func main() {
 		}
 		drawMessageLine(screen, message)
 		if minibufferMode {
-			cursorX := len([]rune(minibufferPrompt)) + len(minibufferInput)
+			cursorX := len([]rune(minibufferPrompt)) + minibufferCursorPos
 			screen.ShowCursor(cursorX, screenHeight-1)
 		} else {
 			screen.ShowCursor(
@@ -408,6 +409,7 @@ func main() {
 					cb := minibufferCallback
 					minibufferMode = false
 					minibufferInput = nil
+					minibufferCursorPos = 0
 					minibufferCallback = nil
 					message = ""
 					if cb != nil {
@@ -416,11 +418,39 @@ func main() {
 				case term.KeyCtrlG, term.KeyEsc:
 					minibufferMode = false
 					minibufferInput = nil
+					minibufferCursorPos = 0
 					minibufferCallback = nil
 					message = "Quit"
 				case term.KeyBackspace, term.KeyBackspace2, term.KeyCtrlH:
-					if len(minibufferInput) > 0 {
-						minibufferInput = minibufferInput[:len(minibufferInput)-1]
+					if minibufferCursorPos > 0 {
+						minibufferInput = append(minibufferInput[:minibufferCursorPos-1], minibufferInput[minibufferCursorPos:]...)
+						minibufferCursorPos--
+					}
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyLeft, term.KeyCtrlB:
+					if minibufferCursorPos > 0 {
+						minibufferCursorPos--
+					}
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyRight, term.KeyCtrlF:
+					if minibufferCursorPos < len(minibufferInput) {
+						minibufferCursorPos++
+					}
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyCtrlA:
+					minibufferCursorPos = 0
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyCtrlE:
+					minibufferCursorPos = len(minibufferInput)
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyCtrlD:
+					if minibufferCursorPos < len(minibufferInput) {
+						minibufferInput = append(minibufferInput[:minibufferCursorPos], minibufferInput[minibufferCursorPos+1:]...)
+					}
+					message = minibufferPrompt + string(minibufferInput)
+				case term.KeyCtrlK:
+					if minibufferCursorPos < len(minibufferInput) {
+						minibufferInput = minibufferInput[:minibufferCursorPos]
 					}
 					message = minibufferPrompt + string(minibufferInput)
 				case term.KeyTab:
@@ -452,15 +482,19 @@ func main() {
 							if len(matches) == 1 {
 								if dir == "." {
 									minibufferInput = []rune(matches[0])
+									minibufferCursorPos = len(minibufferInput)
 								} else {
 									minibufferInput = []rune(dir + "/" + matches[0])
+									minibufferCursorPos = len(minibufferInput)
 								}
 							} else if len(matches) > 1 {
 								common := longestCommonPrefix(matches)
 								if dir == "." {
 									minibufferInput = []rune(common)
+									minibufferCursorPos = len(minibufferInput)
 								} else {
 									minibufferInput = []rune(dir + "/" + common)
+									minibufferCursorPos = len(minibufferInput)
 								}
 								message = minibufferPrompt + string(minibufferInput) + " [" + strings.Join(matches, " ") + "]"
 								redraw()
@@ -473,6 +507,7 @@ func main() {
 						matches := FindCommandsByPrefix(input)
 						if len(matches) == 1 {
 							minibufferInput = []rune(matches[0].Name)
+							minibufferCursorPos = len(minibufferInput)
 						} else if len(matches) > 1 {
 							var names []string
 							for _, m := range matches {
@@ -485,7 +520,10 @@ func main() {
 						message = minibufferPrompt + string(minibufferInput)
 					}
 				case term.KeyRune:
-					minibufferInput = append(minibufferInput, ev.Rune())
+					tail := make([]rune, len(minibufferInput[minibufferCursorPos:]))
+					copy(tail, minibufferInput[minibufferCursorPos:])
+					minibufferInput = append(append(minibufferInput[:minibufferCursorPos], ev.Rune()), tail...)
+					minibufferCursorPos++
 					message = minibufferPrompt + string(minibufferInput)
 				default:
 					// All other keys are ignored in minibuffer mode
@@ -666,6 +704,7 @@ func main() {
 					minibufferMode = true
 					minibufferPrompt = "Find file: "
 					minibufferInput = nil
+					minibufferCursorPos = 0
 					minibufferCallback = func(input string) {
 						if input == "" {
 							message = "No file name specified"
@@ -711,6 +750,7 @@ func main() {
 						minibufferMode = true
 						minibufferPrompt = "Switch to buffer: "
 						minibufferInput = nil
+						minibufferCursorPos = 0
 						minibufferCallback = func(input string) {
 							if input == "" {
 								// Switch to previous buffer
@@ -839,6 +879,7 @@ func main() {
 						minibufferMode = true
 						minibufferPrompt = fmt.Sprintf("Kill buffer: (default %s) ", currentName)
 						minibufferInput = nil
+						minibufferCursorPos = 0
 						minibufferCallback = func(input string) {
 							// Find target buffer
 							targetIdx := activeBufferIdx
@@ -1002,6 +1043,7 @@ func main() {
 				minibufferMode = true
 				minibufferPrompt = "Goto line: "
 				minibufferInput = nil
+				minibufferCursorPos = 0
 				minibufferCallback = func(input string) {
 					n, err := strconv.Atoi(input)
 					if err != nil || n < 1 {
@@ -1064,6 +1106,7 @@ func main() {
 						minibufferMode = true
 						minibufferPrompt = "M-x "
 						minibufferInput = nil
+						minibufferCursorPos = 0
 						minibufferCallback = func(input string) {
 							cmd := FindCommand(input)
 							if cmd != nil {
@@ -1096,6 +1139,7 @@ func main() {
 						minibufferMode = true
 						minibufferPrompt = "M-x "
 						minibufferInput = nil
+						minibufferCursorPos = 0
 						minibufferCallback = func(input string) {
 							cmd := FindCommand(input)
 							if cmd != nil {

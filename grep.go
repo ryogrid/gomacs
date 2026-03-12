@@ -133,6 +133,91 @@ func grepModeHandler(ev *term.KeyEvent, buf *Buffer, message *string) bool {
 	if ev.Key() != term.KeyRune {
 		return false
 	}
+
+	// Handle Alt-modified keys (M-n, M-p)
+	if ev.Modifiers()&term.ModAlt != 0 {
+		switch ev.Rune() {
+		case 'n':
+			// M-n: jump to next file's results
+			if buf.CursorR >= len(buf.Lines) {
+				*message = "No more files"
+				return true
+			}
+			currentResult, ok := ParseGrepLine(string(buf.Lines[buf.CursorR]))
+			if !ok {
+				// Not on a result line; just try to find the next result
+				for i := buf.CursorR + 1; i < len(buf.Lines); i++ {
+					if _, ok := ParseGrepLine(string(buf.Lines[i])); ok {
+						buf.CursorR = i
+						buf.CursorC = 0
+						return true
+					}
+				}
+				*message = "No more files"
+				return true
+			}
+			currentFile := currentResult.File
+			for i := buf.CursorR + 1; i < len(buf.Lines); i++ {
+				if r, ok := ParseGrepLine(string(buf.Lines[i])); ok && r.File != currentFile {
+					buf.CursorR = i
+					buf.CursorC = 0
+					return true
+				}
+			}
+			*message = "No more files"
+			return true
+		case 'p':
+			// M-p: jump to previous file's first result
+			if buf.CursorR >= len(buf.Lines) || buf.CursorR <= 0 {
+				*message = "No more files"
+				return true
+			}
+			currentResult, ok := ParseGrepLine(string(buf.Lines[buf.CursorR]))
+			if !ok {
+				// Not on a result line; try to find the previous result
+				for i := buf.CursorR - 1; i >= 0; i-- {
+					if _, ok := ParseGrepLine(string(buf.Lines[i])); ok {
+						buf.CursorR = i
+						buf.CursorC = 0
+						return true
+					}
+				}
+				*message = "No more files"
+				return true
+			}
+			currentFile := currentResult.File
+			// Scan backward to find a line with a different file
+			prevFileIdx := -1
+			for i := buf.CursorR - 1; i >= 0; i-- {
+				if r, ok := ParseGrepLine(string(buf.Lines[i])); ok && r.File != currentFile {
+					prevFileIdx = i
+					break
+				}
+			}
+			if prevFileIdx < 0 {
+				*message = "No more files"
+				return true
+			}
+			// Now find the first result of that file by scanning backward further
+			prevFile := ""
+			if r, ok := ParseGrepLine(string(buf.Lines[prevFileIdx])); ok {
+				prevFile = r.File
+			}
+			firstOfFile := prevFileIdx
+			for i := prevFileIdx - 1; i >= 0; i-- {
+				if r, ok := ParseGrepLine(string(buf.Lines[i])); ok && r.File == prevFile {
+					firstOfFile = i
+				} else if _, ok := ParseGrepLine(string(buf.Lines[i])); ok {
+					break
+				}
+			}
+			buf.CursorR = firstOfFile
+			buf.CursorC = 0
+			return true
+		}
+		return false
+	}
+
 	switch ev.Rune() {
 	case 'n':
 		// Next grep result
@@ -155,6 +240,15 @@ func grepModeHandler(ev *term.KeyEvent, buf *Buffer, message *string) bool {
 			}
 		}
 		*message = "No more results"
+		return true
+	case 'g':
+		// Refresh: re-execute the last grep command
+		if lastGrepCommand == "" {
+			*message = "No previous grep command"
+			return true
+		}
+		*message = "Searching..."
+		executeGrepCommand(lastGrepCommand)
 		return true
 	case 'q':
 		// Close *grep* buffer and switch to previous buffer

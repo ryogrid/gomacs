@@ -63,6 +63,17 @@ func invokeFindGrep(t *testing.T, h *Harness, cmd string) {
 	h.SendKeys("Enter")
 }
 
+// setupGrepFixtures3Files creates a temp directory with 3 files (a.txt, b.txt, c.txt)
+// each containing the word "marker" on known lines, for predictable grep result ordering.
+func setupGrepFixtures3Files(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeFixture(t, dir, "a.txt", "line1\nmarker alpha\nline3\n")
+	writeFixture(t, dir, "b.txt", "marker bravo\nline2\nmarker bravo2\n")
+	writeFixture(t, dir, "c.txt", "line1\nline2\nmarker charlie\n")
+	return dir
+}
+
 func TestFindGrep(t *testing.T) {
 	t.Run("Invoke", func(t *testing.T) {
 		dir := setupGrepFixtures(t)
@@ -211,5 +222,279 @@ func TestFindGrep(t *testing.T) {
 
 		// Should still be on *scratch*
 		h.AssertStatusBar(t, "*scratch*")
+	})
+
+	t.Run("FileNav_MN", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		// Cursor should be on first result (a.txt)
+		row1, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		h.AssertLineContains(t, row1, "a.txt")
+
+		// M-n to jump to next file (b.txt)
+		h.SendKeys("M-n")
+		time.Sleep(300 * time.Millisecond)
+
+		row2, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		h.AssertLineContains(t, row2, "b.txt")
+
+		// M-n again to jump to c.txt
+		h.SendKeys("M-n")
+		time.Sleep(300 * time.Millisecond)
+
+		row3, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		h.AssertLineContains(t, row3, "c.txt")
+	})
+
+	t.Run("FileNav_MP", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		// M-n twice to get to c.txt
+		h.SendKeys("M-n")
+		time.Sleep(200 * time.Millisecond)
+		h.SendKeys("M-n")
+		time.Sleep(300 * time.Millisecond)
+
+		row1, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		h.AssertLineContains(t, row1, "c.txt")
+
+		// M-p to jump back to b.txt
+		h.SendKeys("M-p")
+		time.Sleep(300 * time.Millisecond)
+
+		row2, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		h.AssertLineContains(t, row2, "b.txt")
+
+		// M-p to jump back to a.txt
+		h.SendKeys("M-p")
+		time.Sleep(300 * time.Millisecond)
+
+		row3, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		h.AssertLineContains(t, row3, "a.txt")
+	})
+
+	t.Run("FileNav_MN_AtLastFile", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		// M-n twice to get to last file (c.txt)
+		h.SendKeys("M-n")
+		time.Sleep(200 * time.Millisecond)
+		h.SendKeys("M-n")
+		time.Sleep(300 * time.Millisecond)
+
+		row1, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+
+		// M-n at last file should show "No more files"
+		h.SendKeys("M-n")
+
+		if err := h.WaitForContent("No more files", 5*time.Second); err != nil {
+			t.Fatalf("No more files message did not appear: %v", err)
+		}
+
+		// Cursor should stay
+		row2, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		if row1 != row2 {
+			t.Errorf("cursor moved after M-n at last file: was row %d, now row %d", row1, row2)
+		}
+	})
+
+	t.Run("FileNav_MP_AtFirstFile", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		row1, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+
+		// M-p at first file should show "No more files"
+		h.SendKeys("M-p")
+
+		if err := h.WaitForContent("No more files", 5*time.Second); err != nil {
+			t.Fatalf("No more files message did not appear: %v", err)
+		}
+
+		row2, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		if row1 != row2 {
+			t.Errorf("cursor moved after M-p at first file: was row %d, now row %d", row1, row2)
+		}
+	})
+
+	t.Run("Refresh_G", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		// Verify initial result count (should show 4 results: a.txt:2, b.txt:1, b.txt:3, c.txt:3)
+		h.AssertStatusBar(t, "Line 1/4")
+
+		// Add a new matching line to a fixture file
+		newPath := filepath.Join(dir, "a.txt")
+		if err := os.WriteFile(newPath, []byte("line1\nmarker alpha\nline3\nmarker alpha2\n"), 0o644); err != nil {
+			t.Fatalf("failed to update fixture: %v", err)
+		}
+
+		// Press g to refresh
+		h.SendKeys("g")
+
+		// Wait for refreshed results (now 5 lines)
+		if err := h.WaitForContent("Line 1/5", 10*time.Second); err != nil {
+			t.Fatalf("refresh did not show new results: %v", err)
+		}
+
+		h.AssertScreenContains(t, "marker alpha2")
+	})
+
+	t.Run("N_AtLastResult", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		// Navigate to last result: press n 3 times (4 results total, start at first)
+		for i := 0; i < 3; i++ {
+			h.SendKeys("n")
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		row1, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+
+		// n at last result should show "No more results"
+		h.SendKeys("n")
+		time.Sleep(200 * time.Millisecond)
+
+		h.AssertMessageLine(t, "No more results")
+
+		row2, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		if row1 != row2 {
+			t.Errorf("cursor moved after n at last result: was row %d, now row %d", row1, row2)
+		}
+	})
+
+	t.Run("P_AtFirstResult", func(t *testing.T) {
+		dir := setupGrepFixtures3Files(t)
+		h := newHarnessInDir(t, dir)
+
+		if err := h.WaitForContent("*scratch*", 5*time.Second); err != nil {
+			t.Fatalf("goomacs did not start: %v", err)
+		}
+
+		invokeFindGrep(t, h, "grep -rnH marker . | sort")
+
+		if err := h.WaitForContent("*grep*", 10*time.Second); err != nil {
+			t.Fatalf("grep buffer did not appear: %v", err)
+		}
+
+		row1, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+
+		// p at first result should show "No more results"
+		h.SendKeys("p")
+		time.Sleep(200 * time.Millisecond)
+
+		h.AssertMessageLine(t, "No more results")
+
+		row2, _, err := h.CursorPosition()
+		if err != nil {
+			t.Fatalf("failed to get cursor: %v", err)
+		}
+		if row1 != row2 {
+			t.Errorf("cursor moved after p at first result: was row %d, now row %d", row1, row2)
+		}
 	})
 }

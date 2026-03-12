@@ -1149,19 +1149,15 @@ func main() {
 		case result := <-grepResultCh:
 			activeWin := windows[activeWindowIdx]
 			stdout := strings.TrimRight(result.stdout, "\n")
-			if result.err != nil && stdout == "" {
-				// Command failed with no stdout output.
-				stderr := strings.TrimRight(result.stderr, "\n")
-				if stderr != "" {
+			stderr := strings.TrimRight(result.stderr, "\n")
+			if stdout == "" {
+				if result.err != nil && stderr != "" {
+					// Command failed with stderr output (e.g., invalid command).
 					message = stderr
 				} else {
-					message = "grep command failed"
+					// No output — either success with no matches (grep exit 1) or empty stdout.
+					message = "No matches found"
 				}
-				redraw()
-				continue
-			}
-			if stdout == "" {
-				message = "No matches found"
 				redraw()
 				continue
 			}

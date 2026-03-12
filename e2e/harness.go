@@ -20,6 +20,13 @@ type Harness struct {
 // Start creates a detached tmux session running the given binary with args.
 func Start(t *testing.T, binary string, args ...string) *Harness {
 	t.Helper()
+	return StartInDir(t, "", binary, args...)
+}
+
+// StartInDir creates a detached tmux session running the given binary with args,
+// starting in the specified working directory. If dir is empty, uses the default.
+func StartInDir(t *testing.T, dir string, binary string, args ...string) *Harness {
+	t.Helper()
 
 	session := fmt.Sprintf("%s-%d", sanitizeSessionName(t.Name()), rand.Intn(100000))
 
@@ -30,14 +37,17 @@ func Start(t *testing.T, binary string, args ...string) *Harness {
 		height:  24,
 	}
 
-	// Build tmux command: tmux new-session -d -s <session> -x 80 -y 24 <binary> <args>
+	// Build tmux command: tmux new-session -d -s <session> -x 80 -y 24 [-c dir] <binary> <args>
 	tmuxArgs := []string{
 		"new-session", "-d",
 		"-s", session,
 		"-x", fmt.Sprintf("%d", h.width),
 		"-y", fmt.Sprintf("%d", h.height),
-		binary,
 	}
+	if dir != "" {
+		tmuxArgs = append(tmuxArgs, "-c", dir)
+	}
+	tmuxArgs = append(tmuxArgs, binary)
 	tmuxArgs = append(tmuxArgs, args...)
 
 	cmd := exec.Command("tmux", tmuxArgs...)
@@ -58,6 +68,16 @@ func Start(t *testing.T, binary string, args ...string) *Harness {
 // SendKeys sends keys to the tmux session.
 func (h *Harness) SendKeys(keys string) {
 	cmd := exec.Command("tmux", "send-keys", "-t", h.session, keys)
+	cmd.CombinedOutput() //nolint: errcheck
+}
+
+// SendKeysRepeat sends the same key multiple times in a single tmux command.
+func (h *Harness) SendKeysRepeat(key string, count int) {
+	args := []string{"send-keys", "-t", h.session}
+	for i := 0; i < count; i++ {
+		args = append(args, key)
+	}
+	cmd := exec.Command("tmux", args...)
 	cmd.CombinedOutput() //nolint: errcheck
 }
 

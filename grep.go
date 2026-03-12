@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -79,6 +81,55 @@ func init() {
 
 // grepModeHandler handles keybindings in the *grep* buffer.
 func grepModeHandler(ev *term.KeyEvent, buf *Buffer, message *string) bool {
+	// Handle Enter key to jump to source
+	if ev.Key() == term.KeyEnter {
+		if buf.CursorR >= len(buf.Lines) {
+			return true
+		}
+		result, ok := ParseGrepLine(string(buf.Lines[buf.CursorR]))
+		if !ok {
+			*message = "No grep result on this line"
+			return true
+		}
+		// Remember the grep buffer index so user can return
+		grepIdx := activeBufferIdx
+		// Check if the file is already open
+		targetIdx := -1
+		for i, b := range buffers {
+			if b.Filename == result.File {
+				targetIdx = i
+				break
+			}
+		}
+		if targetIdx < 0 {
+			// Open the file
+			newBuf, err := NewBufferFromFile(result.File)
+			if err != nil {
+				if os.IsNotExist(err) {
+					*message = fmt.Sprintf("File not found: %s", result.File)
+					return true
+				}
+				*message = fmt.Sprintf("Error: %v", err)
+				return true
+			}
+			buffers = append(buffers, newBuf)
+			targetIdx = len(buffers) - 1
+		}
+		previousBufferIdx = grepIdx
+		activeBufferIdx = targetIdx
+		targetBuf := buffers[targetIdx]
+		targetLine := result.Line - 1
+		if targetLine < 0 {
+			targetLine = 0
+		}
+		if targetLine >= len(targetBuf.Lines) {
+			targetLine = len(targetBuf.Lines) - 1
+		}
+		targetBuf.CursorR = targetLine
+		targetBuf.CursorC = 0
+		return true
+	}
+
 	if ev.Key() != term.KeyRune {
 		return false
 	}

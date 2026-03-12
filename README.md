@@ -21,6 +21,7 @@ goomacs provides a familiar Emacs keybinding experience for quick file editing w
 - **M-x command palette** -- Execute commands by name with tab completion (M-x)
 - **Comment/uncomment region** -- Toggle comments on selected code with automatic language detection (30+ languages)
 - **Tab completion** -- Filename and command name completion in prompts (Tab key)
+- **Find-grep** -- Search across files with M-x find-grep and navigate results (RET, n/p, M-n/M-p)
 - **Goto line** -- Jump to any line by number (C-l)
 - **Minimal dependencies** -- Pure Go implementation using ANSI/VT100 escape sequences
 
@@ -113,6 +114,19 @@ go build -o goomacs .
 |---------|-------------|
 | comment-region | Comment out the selected region (requires active mark) |
 | uncomment-region | Remove comments from the selected region |
+| find-grep | Search across files using find/grep (results in *grep* buffer) |
+
+### Find-Grep (*grep* buffer)
+
+| Key | Action |
+|-----|--------|
+| RET | Jump to source file and line |
+| n | Next result |
+| p | Previous result |
+| M-n | Next file |
+| M-p | Previous file |
+| g | Refresh results |
+| q | Close *grep* buffer |
 
 Language detection is automatic (powered by go-enry). Supported languages include Go, Python, JavaScript, TypeScript, Rust, C, C++, Java, Ruby, Shell, HTML, CSS, SQL, Haskell, Lisp, and 15+ more. For unrecognized languages, `#` is used as the default comment prefix.
 
@@ -129,6 +143,8 @@ The status bar at the bottom of the screen shows:
 goomacs/
 ├── main.go              # Event loop, keybinding dispatch, and UI rendering
 ├── buffer.go            # Buffer data structure and editing operations
+├── grep.go              # Find-grep command, grep output parser, *grep* buffer mode
+├── grep_test.go         # Grep parser unit tests
 ├── command.go           # Command registry, M-x commands, comment/uncomment logic
 ├── highlight.go         # Chroma-based syntax highlighting module
 ├── buffer_test.go       # Buffer unit tests (69 tests)
@@ -148,6 +164,7 @@ goomacs/
 │   ├── killyank_test.go # Kill, yank, and undo tests
 │   ├── buffer_test.go   # Buffer management tests
 │   ├── window_test.go   # Window splitting tests
+│   ├── grep_test.go     # Find-grep E2E tests
 │   ├── highlight_test.go # Syntax highlighting smoke tests
 │   └── testdata/        # Golden files for snapshot assertions
 └── impl_docs/           # Implementation documentation

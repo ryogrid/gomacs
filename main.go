@@ -21,6 +21,12 @@ var modeHandlers = map[string]func(ev *term.KeyEvent, buf *Buffer, message *stri
 // It is "vertical" (top/bottom, C-x 2) or "horizontal" (side-by-side, C-x 3).
 var splitMode = "vertical"
 
+// Minibuffer state — package-level so commands in other files can set them.
+var minibufferMode bool             // true when minibuffer input is active
+var minibufferPrompt string         // prompt shown before input
+var minibufferInput []rune          // current input text
+var minibufferCallback func(string) // called with input on Enter
+
 // bufColToVisualCol converts a buffer column index to a visual (screen) column
 // for the given line, accounting for tab expansion.
 func bufColToVisualCol(line []rune, bufCol int) int {
@@ -200,11 +206,6 @@ func main() {
 	var searchMatchR int    // row of current match (for highlight)
 	var searchMatchC int    // col of current match (for highlight)
 	var searchHasMatch bool // true if current query has a match
-
-	var minibufferMode bool              // true when minibuffer input is active
-	var minibufferPrompt string          // prompt shown before input
-	var minibufferInput []rune           // current input text
-	var minibufferCallback func(string)  // called with input on Enter
 
 	var confirmMode bool           // true when waiting for y/n confirmation
 	var confirmCallback func(bool) // called with true for y, false for n

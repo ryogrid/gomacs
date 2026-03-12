@@ -32,6 +32,8 @@ type Buffer struct {
 	UndoStack      []undoEntry
 	HighlightDirty bool         // true when buffer content changed and needs re-highlighting
 	Highlight      *Highlighter // syntax highlighter (nil if no lexer matches)
+	Mode           string       // buffer-local mode (empty = normal editing)
+	ReadOnly       bool         // true if buffer is read-only
 }
 
 // NewBuffer creates a new empty buffer with one empty line.

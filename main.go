@@ -186,6 +186,7 @@ func main() {
 	activeWindowIdx := 0
 
 	screen := term.NewTerminal()
+	editorScreen = screen
 	if err := screen.Init(); err != nil {
 		fmt.Fprintf(os.Stderr, "error initializing screen: %v\n", err)
 		os.Exit(1)
@@ -1135,6 +1136,66 @@ func main() {
 			}
 			recalcWindows(windows, screenWidth, screenHeight)
 			redraw()
+		}
+
+		// Check for async grep results.
+		select {
+		case result := <-grepResultCh:
+			activeWin := windows[activeWindowIdx]
+			stdout := strings.TrimRight(result.stdout, "\n")
+			if result.err != nil && stdout == "" {
+				// Command failed with no stdout output.
+				stderr := strings.TrimRight(result.stderr, "\n")
+				if stderr != "" {
+					message = stderr
+				} else {
+					message = "grep command failed"
+				}
+				redraw()
+				continue
+			}
+			if stdout == "" {
+				message = "No matches found"
+				redraw()
+				continue
+			}
+			// Create or reuse *grep* buffer.
+			var grepBuf *Buffer
+			grepIdx := -1
+			for i, b := range buffers {
+				if b.Filename == "*grep*" {
+					grepBuf = b
+					grepIdx = i
+					break
+				}
+			}
+			if grepBuf == nil {
+				grepBuf = NewBuffer()
+				grepBuf.Filename = "*grep*"
+				buffers = append(buffers, grepBuf)
+				grepIdx = len(buffers) - 1
+			}
+			// Populate buffer with raw grep output lines.
+			rawLines := strings.Split(stdout, "\n")
+			grepBuf.Lines = make([][]rune, len(rawLines))
+			for i, rl := range rawLines {
+				grepBuf.Lines[i] = []rune(rl)
+			}
+			grepBuf.CursorR = 0
+			grepBuf.CursorC = 0
+			grepBuf.ScrollOffset = 0
+			grepBuf.Mode = "grep"
+			grepBuf.ReadOnly = true
+			grepBuf.Modified = false
+			// Switch to the *grep* buffer.
+			previousBufferIdx = activeBufferIdx
+			activeBufferIdx = grepIdx
+			buf = buffers[activeBufferIdx]
+			activeWin.Buffer = buf
+			activeWin.ScrollOffset = 0
+			message = fmt.Sprintf("grep finished: %d lines", len(rawLines))
+			redraw()
+		default:
 		}
 	}
 }

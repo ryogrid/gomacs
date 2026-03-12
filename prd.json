@@ -1,116 +1,185 @@
 {
   "project": "goomacs",
-  "branchName": "ralph/command-palette-and-comment-region",
-  "description": "Alt+X Command Palette and Comment/Uncomment Region - Emacs-style M-x command prompt with tab completion, plus comment-region and uncomment-region commands with language detection via go-enry",
+  "branchName": "ralph/find-grep",
+  "description": "find-grep Command - Emacs-style M-x find-grep for searching across files with a navigable *grep* results buffer",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Command registry infrastructure",
-      "description": "As a developer, I need a command registry so that named commands can be registered and looked up programmatically.",
+      "title": "Grep output parser with unit tests",
+      "description": "As a developer, I need a testable parser for grep output so that result lines can be reliably split into file path, line number, and matched text.",
       "acceptanceCriteria": [
-        "Create command.go with a Command struct containing Name (string) and Fn (func(*Buffer, *string)) fields",
-        "A package-level var 'commands []Command' holds all registered commands",
-        "RegisterCommand(name string, fn func(*Buffer, *string)) appends to the commands slice",
-        "FindCommand(name string) returns *Command matching the exact name, or nil if not found",
-        "FindCommandsByPrefix(prefix string) returns []Command whose names start with the given prefix",
+        "Create grep.go with a GrepResult struct containing File (string), Line (int), and Text (string) fields",
+        "Implement ParseGrepLine(line string) (GrepResult, bool) that parses a single 'filepath:linenum:text' line; returns the result plus a success boolean",
+        "Lines that don't match the path:number:text pattern (blank lines, header lines, binary file notices) return false",
+        "Correctly handles colons in the text portion (e.g., 'main.go:10:foo := bar:baz' parses as file=main.go, line=10, text=foo := bar:baz)",
+        "Implement ParseGrepOutput(output string) []GrepResult that splits output by newlines and parses each line, skipping unparseable lines",
+        "Create grep_test.go with unit tests covering: standard lines, lines with colons in text, empty lines, non-matching lines, lines with spaces in file paths",
+        "Tests pass (go test ./...)",
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "This is pure infrastructure with no UI. The Fn signature func(*Buffer, *string) gives the handler access to the active buffer and a pointer to the message string for status feedback. Do not register any commands yet — that happens in later stories."
+      "passes": false,
+      "notes": "This is pure parsing logic with no UI. ParseGrepLine should find the first colon, then the second colon (after the line number), and split accordingly. Use strconv.Atoi to validate the line number portion. If it's not a valid integer, return false."
     },
     {
       "id": "US-002",
-      "title": "M-x prompt activation and command execution",
-      "description": "As a user, I want to press Alt+X to open a command input prompt so that I can type a command name to execute.",
+      "title": "Buffer-local keymap mechanism (Mode and ReadOnly fields)",
+      "description": "As a developer, I need a way to attach buffer-specific keybindings so that special buffers like *grep* can have their own key handling.",
       "acceptanceCriteria": [
-        "In the Alt+key section of main.go event loop, handle ev.Rune() == 'x' to enter minibuffer mode",
-        "Minibuffer prompt is set to 'M-x ' and minibufferInput is cleared",
-        "On Enter, the typed input is looked up via FindCommand; if found, the command's Fn is called with the active buffer and &message",
-        "On Enter with an unrecognized command, message is set to 'Unknown command: <input>'",
-        "Escape and C-g cancel the prompt without executing anything",
+        "Add a Mode field (string) to the Buffer struct in buffer.go — empty string means normal editing mode",
+        "Add a ReadOnly field (bool) to the Buffer struct in buffer.go",
+        "Add a package-level var modeHandlers map[string]func(ev *term.KeyEvent, buf *Buffer, message *string) bool in main.go",
+        "Initialize modeHandlers as an empty map in main() or at package level",
+        "In the main event loop, after minibuffer/search/confirm mode checks but before normal key processing: if buf.Mode is non-empty and modeHandlers[buf.Mode] exists, call the handler; if it returns true, skip normal key processing (continue to next event)",
+        "When buf.ReadOnly is true, block character insertion (KeyRune without Alt), backspace, delete (C-d), kill (C-k), yank (C-y), and newline (Enter/C-j) with message 'Buffer is read-only'",
+        "Normal navigation keys (C-n, C-p, C-f, C-b, C-v, M-v, C-a, C-e, arrows) still work in read-only buffers",
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Reuse the existing minibuffer infrastructure (minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback). The callback should look up the command and invoke it. The 'x' case goes in the Alt key handling block around line 983-994 in main.go, alongside existing M-v, M-w, M-<, M-> handlers."
+      "passes": false,
+      "notes": "The mode handler dispatch should go after the prefixCx check and before the main switch on ev.Key(). The ReadOnly check should be in the character insertion and editing sections — not a blanket block on all keys. modeHandlers is a map so other features can register their own modes later. The handler signature includes *Buffer and *string (message) to match the existing command pattern."
     },
     {
       "id": "US-003",
-      "title": "Tab completion for M-x commands",
-      "description": "As a user, I want tab completion in the M-x prompt so that I can quickly find commands without typing the full name.",
+      "title": "find-grep command registration and prompt",
+      "description": "As a user, I want to invoke M-x find-grep and be prompted for a grep command string so that I can search across files.",
       "acceptanceCriteria": [
-        "In the minibuffer Tab handler (main.go ~line 416), add a case for minibufferPrompt == 'M-x '",
-        "Tab calls FindCommandsByPrefix with current input to get matching commands",
-        "If exactly one match, minibufferInput is replaced with the full command name",
-        "If multiple matches, the message line displays the list of matching command names (space-separated)",
-        "If no matches, nothing changes (no crash, no input modification)",
-        "If input is empty, all commands are displayed in the message line",
+        "Register a 'find-grep' command via RegisterCommand in an init() function in grep.go",
+        "When invoked, the command opens a minibuffer prompt with prompt text 'Run find-grep: '",
+        "The minibuffer input is pre-populated with the default command: find . -type f -exec grep -nH -e '' {} +",
+        "Pressing Enter submits the full command string to the callback for execution",
+        "Pressing Escape or C-g cancels the prompt",
+        "The callback stores the submitted command string in a package-level var lastGrepCommand for later re-execution via g",
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "The existing Tab handler in the minibuffer event loop checks minibufferPrompt to decide what to complete. Currently it only handles 'Find file: '. Add an else-if for 'M-x '. Use strings.Join on the command names for the candidate list display."
+      "passes": false,
+      "notes": "The command handler has signature func(*Buffer, *string). It needs to set minibufferMode, minibufferPrompt, minibufferInput, and minibufferCallback — these are package-level vars in main.go. Since grep.go is in the same package (main), it can access them directly. Set minibufferInput to []rune of the default command string. The callback will be implemented in the next story."
     },
     {
       "id": "US-004",
-      "title": "Language detection and comment style lookup",
-      "description": "As a developer, I need to detect the programming language of the current buffer and look up its comment delimiters.",
+      "title": "Async command execution and *grep* buffer creation",
+      "description": "As a user, I want the grep command to execute and show results in a *grep* buffer so that I can browse matches.",
       "acceptanceCriteria": [
-        "go-enry/go-enry/v2 is added as a dependency (go get github.com/go-enry/go-enry/v2)",
-        "In command.go, define a CommentStyle struct with fields: LinePrefix (string), BlockStart (string), BlockEnd (string)",
-        "A hardcoded var commentStyles map[string]CommentStyle maps language names (as returned by go-enry) to their comment delimiters",
-        "At least 30 languages are covered: Go, Python, JavaScript, TypeScript, Rust, C, C++, Java, Kotlin, Swift, Ruby, PHP, Shell, Perl, Lua, R, SQL, HTML, XML, CSS, SCSS, Haskell, Common Lisp, Clojure, Scheme, Erlang, Elixir, YAML, TOML, Makefile",
-        "A function detectCommentStyle(filename string, content string) CommentStyle uses enry.GetLanguage(filename, []byte(content)) to detect language, then looks up the comment style in the map",
-        "If the language is not detected or not in the map, the function returns CommentStyle{LinePrefix: '#'} as the default",
+        "The minibuffer callback from US-003 executes the command string via os/exec using sh -c",
+        "Execution runs in a goroutine; message is set to 'Searching...' before launching",
+        "On completion, results are parsed via ParseGrepOutput and displayed in a *grep* buffer",
+        "The *grep* buffer has Mode='grep', ReadOnly=true, and Filename='*grep*'",
+        "If a *grep* buffer already exists in the buffers list, it is reused (Lines cleared and repopulated) rather than creating a new one",
+        "The *grep* buffer is made the active buffer (activeBufferIdx updated, activeWin.Buffer set)",
+        "If the command produces no stdout output, message is set to 'No matches found' and no buffer is created/shown",
+        "If the command fails (non-zero exit with stderr), stderr content is displayed as the message",
+        "A mechanism exists to notify the main event loop when the goroutine completes (e.g., a channel checked in the event loop, or a synthetic event injected into the terminal)",
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "go-enry returns language names like 'Go', 'Python', 'JavaScript', 'HTML', 'CSS', etc. The map keys must match these exact names. For languages with line comments only (Go, Python, etc.), set LinePrefix and leave BlockStart/BlockEnd empty. For languages with block comments only (HTML, CSS), set BlockStart/BlockEnd and leave LinePrefix empty. Some languages have both (C, Java) — set LinePrefix for the common case. enry.GetLanguage takes (filename string, content []byte) and returns a language name string."
+      "passes": false,
+      "notes": "The async notification is the trickiest part. Options: (1) Add a channel var grepResultCh chan grepResult that the main event loop checks after each PollEvent with a non-blocking select. (2) Use the terminal's event injection if available. Option 1 is simpler. The goroutine sends results (stdout, stderr, error) on the channel. The main loop checks it each iteration. When results arrive, create/update the *grep* buffer. The buffer's Lines should be set to the raw grep output lines converted to [][]rune."
     },
     {
       "id": "US-005",
-      "title": "comment-region command",
-      "description": "As a user, I want to comment out a selected region of code so that I can quickly disable a block of code.",
+      "title": "*grep* buffer keybindings — n, p, q navigation",
+      "description": "As a user, I want to navigate grep results with n/p and close the buffer with q.",
       "acceptanceCriteria": [
-        "A commentRegion function is implemented and registered as 'comment-region' via RegisterCommand",
-        "If buf.MarkActive is false, sets message to 'No region selected' and returns",
-        "Calls buf.SaveUndo() once before any modifications",
-        "Uses buf.regionBounds() to get startR and endR (start and end rows of the region)",
-        "Calls detectCommentStyle with buf.Filename and buffer content to get the comment style",
-        "For languages with LinePrefix: prepends 'LinePrefix ' (with trailing space) to each line from startR to endR inclusive",
-        "For languages with only BlockStart/BlockEnd: wraps each line individually as 'BlockStart line BlockEnd'",
-        "Sets buf.Modified = true and buf.HighlightDirty = true after modification",
-        "Calls buf.DeactivateMark() after the operation",
-        "Sets message to 'Region commented'",
+        "Register a 'grep' mode handler in modeHandlers map",
+        "n key moves cursor to the next line that is a valid grep result (parsed by ParseGrepLine); shows 'No more results' and stays in place at the last result",
+        "p key moves cursor to the previous valid grep result line; shows 'No more results' and stays in place at the first result",
+        "q key closes the *grep* buffer (removes from buffers slice), switches to the previous buffer (previousBufferIdx), and updates activeWin.Buffer",
+        "The mode handler returns true for n, p, q keys to consume them; returns false for all other keys so normal navigation (C-n, C-p, C-v, M-v, arrows, C-a, C-e) falls through to the standard handler",
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "buf.Lines is [][]rune. To prepend a comment prefix, convert the prefix to []rune and prepend it to buf.Lines[row]. buf.regionBounds() returns (startR, startC, endR, endC) — only use startR and endR since commenting operates on full lines. To get buffer content as a string for detectCommentStyle, join all lines with newlines. Remember to call RegisterCommand in an init() function or at package level."
+      "passes": false,
+      "notes": "The grep mode handler checks ev.Key() == term.KeyRune and then ev.Rune() for 'n', 'p', 'q'. For n: scan forward from CursorR+1 to find the next line where ParseGrepLine returns true. For p: scan backward from CursorR-1. For q: find the *grep* buffer index in buffers, remove it with append(buffers[:i], buffers[i+1:]...), adjust activeBufferIdx. Remember to handle the case where removing the buffer changes indices."
     },
     {
       "id": "US-006",
-      "title": "uncomment-region command",
-      "description": "As a user, I want to uncomment a selected region of code so that I can re-enable previously commented code.",
+      "title": "*grep* buffer keybindings — RET jump to source",
+      "description": "As a user, I want to press Enter on a grep result to jump to the matching file and line.",
       "acceptanceCriteria": [
-        "An uncommentRegion function is implemented and registered as 'uncomment-region' via RegisterCommand",
-        "If buf.MarkActive is false, sets message to 'No region selected' and returns",
-        "Calls buf.SaveUndo() once before any modifications",
-        "Uses buf.regionBounds() to get startR and endR",
-        "Calls detectCommentStyle with buf.Filename and buffer content to get the comment style",
-        "For line comments: removes the first occurrence of 'LinePrefix ' (with space) or 'LinePrefix' (without space) from each line, tolerating leading whitespace before the prefix",
-        "For block comments: removes BlockStart (with optional trailing space) from the beginning and BlockEnd (with optional leading space) from the end of each line",
-        "Lines that do not contain the comment markers are left unchanged",
-        "Sets buf.Modified = true and buf.HighlightDirty = true after modification",
-        "Calls buf.DeactivateMark() after the operation",
-        "Sets message to 'Region uncommented'",
+        "RET (Enter) on a result line parses the current line using ParseGrepLine to extract file path and line number",
+        "If the file is already open in an existing buffer (check buffers list by Filename), switch to that buffer instead of opening a new one",
+        "If the file is not open, load it via NewBufferFromFile and add it to the buffers list",
+        "If the file does not exist (NewBufferFromFile returns os.IsNotExist error), display message 'File not found: <path>' and stay in the *grep* buffer",
+        "After opening/switching to the buffer, move cursor to the target line (set CursorR = lineNumber - 1, CursorC = 0)",
+        "Adjust ScrollOffset so the target line is visible in the window",
+        "The mode handler returns true for KeyEnter to consume it",
         "Typecheck passes (go vet ./...)"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "For line comment removal, use strings.Index or a manual scan on the string version of each line to find the prefix position. Handle both '// code' (prefix+space) and '//code' (prefix only). For whitespace tolerance, trim leading whitespace to find the prefix, but preserve the indentation structure (only remove the prefix itself, not the indentation). buf.Lines[row] is []rune — convert to string for matching, then back to []rune after modification."
+      "passes": false,
+      "notes": "To scroll the target line into view, set ScrollOffset = max(0, targetLine - viewHeight/2) to center it. Check all existing buffers by comparing b.Filename to the grep result's File field. If the result File is a relative path like './foo.go', it should match a buffer with Filename './foo.go'. When jumping, update previousBufferIdx to point to the *grep* buffer index so the user can easily return."
+    },
+    {
+      "id": "US-007",
+      "title": "*grep* buffer keybindings — M-n, M-p file navigation and g refresh",
+      "description": "As a user, I want to skip between files in grep results and refresh the search.",
+      "acceptanceCriteria": [
+        "M-n (Alt+N) in grep mode: parse current line to get current file, scan forward to find the first result line with a different file path, move cursor there; show 'No more files' at last file's results",
+        "M-p (Alt+P) in grep mode: parse current line to get current file, scan backward to find the first result line with a different file path, then scan backward further to find the first result of THAT file, move cursor there; show 'No more files' at first file's results",
+        "g key re-executes lastGrepCommand (the stored command string) and refreshes the *grep* buffer with new results",
+        "After g, cursor is reset to the first result line (CursorR = 0, CursorC = 0, ScrollOffset = 0)",
+        "The mode handler returns true for M-n, M-p (check ModAlt), and g to consume them",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "For M-n: get current file from ParseGrepLine on current line. Scan forward from CursorR+1; skip lines with the same file. Stop at the first line with a different file. For M-p: similar but scan backward — find the first line with a different file, then continue backward to find where that file's results start. For g: reuse the same execution logic from US-004 (extract it into a helper function like executeGrepCommand(cmd string)). The Alt modifier is detected via ev.Modifiers()&term.ModAlt != 0."
+    },
+    {
+      "id": "US-008",
+      "title": "E2E tests — basic find-grep flow",
+      "description": "As a developer, I want E2E tests covering the core find-grep workflow.",
+      "acceptanceCriteria": [
+        "Create e2e/grep_test.go with test functions in a TestFindGrep group",
+        "Set up a temporary directory tree with multiple files containing known content across nested directories using createTestFile helper",
+        "Test invoke: open goomacs in the temp dir, M-x find-grep, edit command to search for a known string, Enter — verify *grep* buffer appears with expected filepath:linenum:text results",
+        "Test RET: navigate to a result line, press Enter, verify the correct file opens and status bar shows expected filename and line number",
+        "Test n/p: verify cursor moves to correct next/previous result lines",
+        "Test q: verify *grep* buffer closes and previous buffer is restored",
+        "Test no matches: search for a nonexistent string, verify 'No matches found' message",
+        "Test malformed command: enter an invalid command, verify error message from stderr appears",
+        "All tests pass with 'go test ./e2e/ -v -timeout 120s -run TestFindGrep'",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Start goomacs with the working directory set to the temp fixture dir (use Harness.Start with appropriate args or chdir). For M-x, send 'Escape' then 'x' with 50ms gap. Then type 'find-grep' and Enter. To modify the default command, use C-a to go to beginning, C-k to kill the line, then type the custom command. Wait for *grep* to appear with WaitForContent. For tmux SendKeys, use the existing patterns from other e2e tests."
+    },
+    {
+      "id": "US-009",
+      "title": "E2E tests — file navigation and refresh",
+      "description": "As a developer, I want E2E tests for M-n/M-p file navigation and g refresh.",
+      "acceptanceCriteria": [
+        "Set up fixtures with matches spanning at least 3 different files (e.g., a.go, b.go, c.go each containing the search term on different lines)",
+        "Test M-n: verify cursor jumps from file1's results to file2's first result, then to file3's — check by asserting the line content changes to show a different file path",
+        "Test M-p: verify cursor jumps back from file3 to file2, then to file1",
+        "Test M-n at last file: verify 'No more files' message and cursor stays on current line",
+        "Test M-p at first file: verify 'No more files' message and cursor stays on current line",
+        "Test g refresh: run grep, use os.WriteFile to add a new matching line to a fixture file, press g, verify new result appears in refreshed *grep* buffer",
+        "Test n at last result: verify 'No more results' message and cursor stays",
+        "Test p at first result: verify 'No more results' message and cursor stays",
+        "All tests pass with 'go test ./e2e/ -v -timeout 120s -run TestFindGrep'",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "For M-n/M-p, send 'Escape' then 'n'/'p' with 50ms gap. For g, just send 'g'. To verify cursor position, use AssertLineContains on the current cursor row (get cursor position via CursorPosition helper) or check message line content. For the refresh test, the fixture file modification must happen outside goomacs (direct os.WriteFile), then pressing g in the *grep* buffer should show the new match."
+    },
+    {
+      "id": "US-010",
+      "title": "README update for find-grep feature",
+      "description": "As a user, I want the README to document the find-grep feature so I know how to use it.",
+      "acceptanceCriteria": [
+        "Add 'find-grep' row to the 'Available commands' table in the Command Palette section with description 'Search across files using find/grep (results in *grep* buffer)'",
+        "Add a 'Find-Grep (*grep* buffer)' subsection under Keybindings with a table documenting: RET (jump to source), n (next result), p (previous result), M-n (next file), M-p (previous file), g (refresh results), q (close *grep* buffer)",
+        "Add '**Find-grep** -- Search across files with M-x find-grep and navigate results (RET, n/p, M-n/M-p)' to the Features list",
+        "Add 'grep.go' and 'grep_test.go' entries to the Project Structure section",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Keep the documentation concise and consistent with existing README tone. The *grep* buffer keybinding table should be placed after the Command Palette section since it describes a special buffer mode, not a global keybinding. Use the same table format as existing keybinding sections (| Key | Action |)."
     }
   ]
 }

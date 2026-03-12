@@ -1,0 +1,116 @@
+{
+  "project": "goomacs",
+  "branchName": "ralph/command-palette-and-comment-region",
+  "description": "Alt+X Command Palette and Comment/Uncomment Region - Emacs-style M-x command prompt with tab completion, plus comment-region and uncomment-region commands with language detection via go-enry",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Command registry infrastructure",
+      "description": "As a developer, I need a command registry so that named commands can be registered and looked up programmatically.",
+      "acceptanceCriteria": [
+        "Create command.go with a Command struct containing Name (string) and Fn (func(*Buffer, *string)) fields",
+        "A package-level var 'commands []Command' holds all registered commands",
+        "RegisterCommand(name string, fn func(*Buffer, *string)) appends to the commands slice",
+        "FindCommand(name string) returns *Command matching the exact name, or nil if not found",
+        "FindCommandsByPrefix(prefix string) returns []Command whose names start with the given prefix",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "This is pure infrastructure with no UI. The Fn signature func(*Buffer, *string) gives the handler access to the active buffer and a pointer to the message string for status feedback. Do not register any commands yet — that happens in later stories."
+    },
+    {
+      "id": "US-002",
+      "title": "M-x prompt activation and command execution",
+      "description": "As a user, I want to press Alt+X to open a command input prompt so that I can type a command name to execute.",
+      "acceptanceCriteria": [
+        "In the Alt+key section of main.go event loop, handle ev.Rune() == 'x' to enter minibuffer mode",
+        "Minibuffer prompt is set to 'M-x ' and minibufferInput is cleared",
+        "On Enter, the typed input is looked up via FindCommand; if found, the command's Fn is called with the active buffer and &message",
+        "On Enter with an unrecognized command, message is set to 'Unknown command: <input>'",
+        "Escape and C-g cancel the prompt without executing anything",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "Reuse the existing minibuffer infrastructure (minibufferMode, minibufferPrompt, minibufferInput, minibufferCallback). The callback should look up the command and invoke it. The 'x' case goes in the Alt key handling block around line 983-994 in main.go, alongside existing M-v, M-w, M-<, M-> handlers."
+    },
+    {
+      "id": "US-003",
+      "title": "Tab completion for M-x commands",
+      "description": "As a user, I want tab completion in the M-x prompt so that I can quickly find commands without typing the full name.",
+      "acceptanceCriteria": [
+        "In the minibuffer Tab handler (main.go ~line 416), add a case for minibufferPrompt == 'M-x '",
+        "Tab calls FindCommandsByPrefix with current input to get matching commands",
+        "If exactly one match, minibufferInput is replaced with the full command name",
+        "If multiple matches, the message line displays the list of matching command names (space-separated)",
+        "If no matches, nothing changes (no crash, no input modification)",
+        "If input is empty, all commands are displayed in the message line",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "The existing Tab handler in the minibuffer event loop checks minibufferPrompt to decide what to complete. Currently it only handles 'Find file: '. Add an else-if for 'M-x '. Use strings.Join on the command names for the candidate list display."
+    },
+    {
+      "id": "US-004",
+      "title": "Language detection and comment style lookup",
+      "description": "As a developer, I need to detect the programming language of the current buffer and look up its comment delimiters.",
+      "acceptanceCriteria": [
+        "go-enry/go-enry/v2 is added as a dependency (go get github.com/go-enry/go-enry/v2)",
+        "In command.go, define a CommentStyle struct with fields: LinePrefix (string), BlockStart (string), BlockEnd (string)",
+        "A hardcoded var commentStyles map[string]CommentStyle maps language names (as returned by go-enry) to their comment delimiters",
+        "At least 30 languages are covered: Go, Python, JavaScript, TypeScript, Rust, C, C++, Java, Kotlin, Swift, Ruby, PHP, Shell, Perl, Lua, R, SQL, HTML, XML, CSS, SCSS, Haskell, Common Lisp, Clojure, Scheme, Erlang, Elixir, YAML, TOML, Makefile",
+        "A function detectCommentStyle(filename string, content string) CommentStyle uses enry.GetLanguage(filename, []byte(content)) to detect language, then looks up the comment style in the map",
+        "If the language is not detected or not in the map, the function returns CommentStyle{LinePrefix: '#'} as the default",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "go-enry returns language names like 'Go', 'Python', 'JavaScript', 'HTML', 'CSS', etc. The map keys must match these exact names. For languages with line comments only (Go, Python, etc.), set LinePrefix and leave BlockStart/BlockEnd empty. For languages with block comments only (HTML, CSS), set BlockStart/BlockEnd and leave LinePrefix empty. Some languages have both (C, Java) — set LinePrefix for the common case. enry.GetLanguage takes (filename string, content []byte) and returns a language name string."
+    },
+    {
+      "id": "US-005",
+      "title": "comment-region command",
+      "description": "As a user, I want to comment out a selected region of code so that I can quickly disable a block of code.",
+      "acceptanceCriteria": [
+        "A commentRegion function is implemented and registered as 'comment-region' via RegisterCommand",
+        "If buf.MarkActive is false, sets message to 'No region selected' and returns",
+        "Calls buf.SaveUndo() once before any modifications",
+        "Uses buf.regionBounds() to get startR and endR (start and end rows of the region)",
+        "Calls detectCommentStyle with buf.Filename and buffer content to get the comment style",
+        "For languages with LinePrefix: prepends 'LinePrefix ' (with trailing space) to each line from startR to endR inclusive",
+        "For languages with only BlockStart/BlockEnd: wraps each line individually as 'BlockStart line BlockEnd'",
+        "Sets buf.Modified = true and buf.HighlightDirty = true after modification",
+        "Calls buf.DeactivateMark() after the operation",
+        "Sets message to 'Region commented'",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "buf.Lines is [][]rune. To prepend a comment prefix, convert the prefix to []rune and prepend it to buf.Lines[row]. buf.regionBounds() returns (startR, startC, endR, endC) — only use startR and endR since commenting operates on full lines. To get buffer content as a string for detectCommentStyle, join all lines with newlines. Remember to call RegisterCommand in an init() function or at package level."
+    },
+    {
+      "id": "US-006",
+      "title": "uncomment-region command",
+      "description": "As a user, I want to uncomment a selected region of code so that I can re-enable previously commented code.",
+      "acceptanceCriteria": [
+        "An uncommentRegion function is implemented and registered as 'uncomment-region' via RegisterCommand",
+        "If buf.MarkActive is false, sets message to 'No region selected' and returns",
+        "Calls buf.SaveUndo() once before any modifications",
+        "Uses buf.regionBounds() to get startR and endR",
+        "Calls detectCommentStyle with buf.Filename and buffer content to get the comment style",
+        "For line comments: removes the first occurrence of 'LinePrefix ' (with space) or 'LinePrefix' (without space) from each line, tolerating leading whitespace before the prefix",
+        "For block comments: removes BlockStart (with optional trailing space) from the beginning and BlockEnd (with optional leading space) from the end of each line",
+        "Lines that do not contain the comment markers are left unchanged",
+        "Sets buf.Modified = true and buf.HighlightDirty = true after modification",
+        "Calls buf.DeactivateMark() after the operation",
+        "Sets message to 'Region uncommented'",
+        "Typecheck passes (go vet ./...)"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": "For line comment removal, use strings.Index or a manual scan on the string version of each line to find the prefix position. Handle both '// code' (prefix+space) and '//code' (prefix only). For whitespace tolerance, trim leading whitespace to find the prefix, but preserve the indentation structure (only remove the prefix itself, not the indentation). buf.Lines[row] is []rune — convert to string for matching, then back to []rune after modification."
+    }
+  ]
+}

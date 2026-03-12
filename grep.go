@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// lastGrepCommand stores the most recently executed grep command for re-execution via g.
+var lastGrepCommand string
+
 // GrepResult represents a single parsed grep output line.
 type GrepResult struct {
 	File string
@@ -50,4 +53,20 @@ func ParseGrepOutput(output string) []GrepResult {
 		}
 	}
 	return results
+}
+
+func init() {
+	RegisterCommand("find-grep", findGrepCommand)
+}
+
+// findGrepCommand opens a minibuffer prompt for the find-grep command.
+func findGrepCommand(buf *Buffer, message *string) {
+	defaultCmd := "find . -type f -exec grep -nH -e '' {} +"
+	minibufferMode = true
+	minibufferPrompt = "Run find-grep: "
+	minibufferInput = []rune(defaultCmd)
+	minibufferCallback = func(input string) {
+		lastGrepCommand = input
+	}
+	*message = minibufferPrompt + defaultCmd
 }

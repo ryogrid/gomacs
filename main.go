@@ -13,6 +13,10 @@ import (
 
 const tabWidth = 8
 
+// modeHandlers maps buffer mode names to key event handlers.
+// If a handler returns true, the key is consumed and normal processing is skipped.
+var modeHandlers = map[string]func(ev *term.KeyEvent, buf *Buffer, message *string) bool{}
+
 // splitMode tracks the current window split orientation.
 // It is "vertical" (top/bottom, C-x 2) or "horizontal" (side-by-side, C-x 3).
 var splitMode = "vertical"
@@ -508,6 +512,48 @@ func main() {
 				}
 				redraw()
 				continue
+			}
+
+			// Handle buffer-local mode handlers
+			if buf.Mode != "" {
+				if handler, ok := modeHandlers[buf.Mode]; ok {
+					if handler(ev, buf, &message) {
+						redraw()
+						continue
+					}
+				}
+			}
+
+			// Handle read-only buffer restrictions
+			if buf.ReadOnly {
+				switch ev.Key() {
+				case term.KeyRune:
+					if ev.Modifiers()&term.ModAlt == 0 {
+						message = "Buffer is read-only"
+						redraw()
+						continue
+					}
+				case term.KeyBackspace, term.KeyBackspace2, term.KeyCtrlH:
+					message = "Buffer is read-only"
+					redraw()
+					continue
+				case term.KeyCtrlD:
+					message = "Buffer is read-only"
+					redraw()
+					continue
+				case term.KeyCtrlK:
+					message = "Buffer is read-only"
+					redraw()
+					continue
+				case term.KeyCtrlY:
+					message = "Buffer is read-only"
+					redraw()
+					continue
+				case term.KeyEnter, term.KeyCtrlJ:
+					message = "Buffer is read-only"
+					redraw()
+					continue
+				}
 			}
 
 			// Reset consecutive kill tracking for non-kill keys

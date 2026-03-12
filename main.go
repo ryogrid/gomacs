@@ -21,6 +21,11 @@ var modeHandlers = map[string]func(ev *term.KeyEvent, buf *Buffer, message *stri
 // It is "vertical" (top/bottom, C-x 2) or "horizontal" (side-by-side, C-x 3).
 var splitMode = "vertical"
 
+// Editor state — package-level so commands in other files can access them.
+var buffers []*Buffer
+var activeBufferIdx int
+var previousBufferIdx int
+
 // Minibuffer state — package-level so commands in other files can set them.
 var minibufferMode bool             // true when minibuffer input is active
 var minibufferPrompt string         // prompt shown before input
@@ -156,7 +161,6 @@ func recalcWindows(windows []*Window, screenWidth, screenHeight int) {
 
 func main() {
 	// Load buffers from file arguments or create empty *scratch* buffer.
-	var buffers []*Buffer
 	if len(os.Args) > 1 {
 		for _, filename := range os.Args[1:] {
 			b, err := NewBufferFromFile(filename)
@@ -177,8 +181,8 @@ func main() {
 		scratch.Filename = "*scratch*"
 		buffers = append(buffers, scratch)
 	}
-	activeBufferIdx := 0
-	previousBufferIdx := 0
+	activeBufferIdx = 0
+	previousBufferIdx = 0
 	buf := buffers[activeBufferIdx]
 
 	// Create initial window showing the active buffer.
@@ -520,6 +524,8 @@ func main() {
 			if buf.Mode != "" {
 				if handler, ok := modeHandlers[buf.Mode]; ok {
 					if handler(ev, buf, &message) {
+						buf = buffers[activeBufferIdx]
+						activeWin.Buffer = buf
 						redraw()
 						continue
 					}
